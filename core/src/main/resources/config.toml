@@ -1,0 +1,18 @@
+[general]
+view-distance = 48.0
+debug = false
+
+# Tick rates in server ticks (20 ticks = 1 second)
+[tick-rates]
+visibility = 10
+ai = 1
+proximity = 2
+
+[performance]
+async-visibility = true
+packet-batching = true
+packet-batch-size = 64
+packet-batch-flush-interval = 50
+
+[skin]
+cache-duration = 60

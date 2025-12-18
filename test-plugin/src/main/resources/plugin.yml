@@ -1,0 +1,17 @@
+name: PhantomTest
+version: 1.0.0
+main: prisons.solar.phantom.test.PhantomTestPlugin
+api-version: "1.21"
+author: SolarPrisons
+description: Test plugin for Phantom NPC library
+depend:
+  - packetevents
+commands:
+  npctest:
+    description: Test NPC commands
+    usage: /npctest <spawn|despawn|move|skin|list|clear>
+    permission: phantom.test
+permissions:
+  phantom.test:
+    description: Access to NPC test commands
+    default: op
