@@ -1,22 +1,70 @@
-# Gradle
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# IDE
-.idea/
-*.iml
-.vscode/
-.settings/
-.project
-.classpath
-*.swp
-
-# OS
+# ===============================
+# OS / Editor junk
+# ===============================
 .DS_Store
 Thumbs.db
 
-# Runtime
-run/
-logs/
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# ===============================
+# Java / Gradle
+# ===============================
+# Compiled output
+build/
+target/
+bin/
+
+# Gradle files
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs
 *.log
+
+# ===============================
+# Minecraft / PaperMC
+# ===============================
+# Plugin JARs (optional – remove if you commit artifacts)
+*.jar
+
+# Runtime server folders (if repo lives near server dir)
+run/
+server/
+paper/
+plugins/
+world/
+world_nether/
+world_the_end/
+cache/
+
+# ===============================
+# Testing / profiling
+# ===============================
+hs_err_pid*
+replay_pid*
+
+# ===============================
+# Environment / secrets
+# ===============================
+.env
+.env.*
+
+# ===============================
+# Claude
+# ===============================
+.claude/
+.codex/
+
+# ===============================
+# Misc
+# ===============================
+tmp/
+temp/
