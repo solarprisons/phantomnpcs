@@ -1,30 +1,28 @@
 package prisons.solar.npclib.paper.npc;
 
+import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.display.AbstractDisplayMeta;
 import me.tofaa.entitylib.meta.display.ItemDisplayMeta;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.appearance.ItemDisplayAppearance;
-import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.npc.Position;
 
-/**
- * Item display NPC implementation using EntityLib.
- */
 public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDisplayAppearance> {
 
     private final EntityLibItemDisplayAppearance itemDisplayAppearance;
 
     public EntityLibItemDisplayNPC(@NotNull Position position) {
-        super(EntityType.ITEM_DISPLAY, position);
+        super(prisons.solar.npclib.api.entity.EntityType.ITEM_DISPLAY, position);
         this.itemDisplayAppearance = new EntityLibItemDisplayAppearance(this);
         this.appearance = itemDisplayAppearance;
     }
 
     @Override
-    protected com.github.retrooper.packetevents.protocol.entity.type.EntityType getPacketEventsEntityType() {
+    protected EntityType getPacketEventsEntityType() {
         return EntityTypes.ITEM_DISPLAY;
     }
 
@@ -35,9 +33,8 @@ public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDis
         }
 
         Object item = itemDisplayAppearance.getItem();
-        if (item instanceof ItemStack bukkitItem) {
-            com.github.retrooper.packetevents.protocol.item.ItemStack peItem =
-                    SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
+        if (item instanceof org.bukkit.inventory.ItemStack bukkitItem) {
+            ItemStack peItem = SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
             meta.setItem(peItem);
         }
 
@@ -52,12 +49,10 @@ public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDis
         }
 
         wrapperEntity.consumeEntityMeta(ItemDisplayMeta.class, meta -> {
-            // Base entity flags
             meta.setOnFire(itemDisplayAppearance.isOnFire());
             meta.setInvisible(itemDisplayAppearance.isInvisible());
             meta.setGlowing(itemDisplayAppearance.isGlowing());
 
-            // Display common properties
             meta.setBillboardConstraints(convertBillboard(itemDisplayAppearance.getBillboardMode()));
             meta.setTransformationInterpolationDuration(itemDisplayAppearance.getInterpolationDuration());
             meta.setInterpolationDelay(itemDisplayAppearance.getInterpolationDelay());
@@ -67,11 +62,9 @@ public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDis
             meta.setWidth(itemDisplayAppearance.getDisplayWidth());
             meta.setHeight(itemDisplayAppearance.getDisplayHeight());
 
-            // Item-specific properties
             Object item = itemDisplayAppearance.getItem();
-            if (item instanceof ItemStack bukkitItem) {
-                com.github.retrooper.packetevents.protocol.item.ItemStack peItem =
-                        SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
+            if (item instanceof org.bukkit.inventory.ItemStack bukkitItem) {
+                ItemStack peItem = SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
                 meta.setItem(peItem);
             }
 
@@ -95,8 +88,7 @@ public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDis
         };
     }
 
-    private AbstractDisplayMeta.BillboardConstraints convertBillboard(
-            prisons.solar.npclib.api.appearance.DisplayAppearance.BillboardMode mode) {
+    private AbstractDisplayMeta.BillboardConstraints convertBillboard(DisplayAppearance.BillboardMode mode) {
         return switch (mode) {
             case FIXED -> AbstractDisplayMeta.BillboardConstraints.FIXED;
             case VERTICAL -> AbstractDisplayMeta.BillboardConstraints.VERTICAL;

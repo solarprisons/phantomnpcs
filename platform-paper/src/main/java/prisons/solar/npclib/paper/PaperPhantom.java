@@ -1,5 +1,6 @@
 package prisons.solar.npclib.paper;
 
+import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import me.tofaa.entitylib.APIConfig;
 import me.tofaa.entitylib.EntityLib;
@@ -165,7 +166,7 @@ public class PaperPhantom implements Phantom {
 
         // Initialize EntityLib
         SpigotEntityLibPlatform entityLibPlatform = new SpigotEntityLibPlatform((JavaPlugin) plugin);
-        APIConfig entityLibConfig = new APIConfig(com.github.retrooper.packetevents.PacketEvents.getAPI())
+        APIConfig entityLibConfig = new APIConfig(PacketEvents.getAPI())
                 .usePlatformLogger();
         EntityLib.init(entityLibPlatform, entityLibConfig);
 
@@ -276,7 +277,7 @@ public class PaperPhantom implements Phantom {
         for (Object packet : packets) {
             if (packet instanceof PacketWrapper<?> wrapper) {
                 try {
-                    com.github.retrooper.packetevents.PacketEvents.getAPI()
+                    PacketEvents.getAPI()
                             .getPlayerManager()
                             .sendPacket(user, wrapper);
                 } catch (Exception e) {

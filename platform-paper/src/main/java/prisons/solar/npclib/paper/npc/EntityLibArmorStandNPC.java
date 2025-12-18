@@ -1,7 +1,11 @@
 package prisons.solar.npclib.paper.npc;
 
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
+import com.github.retrooper.packetevents.protocol.world.Location;
 import com.github.retrooper.packetevents.util.Vector3f;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.other.ArmorStandMeta;
 import me.tofaa.entitylib.wrapper.WrapperLivingEntity;
 import net.kyori.adventure.text.Component;
@@ -18,9 +22,6 @@ import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
 
-/**
- * Armor stand NPC implementation using EntityLib.
- */
 public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
 
     private WrapperLivingEntity wrapperEntity;
@@ -33,11 +34,6 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
         this.appearance = armorStandAppearance;
     }
 
-    /**
-     * Sets the event bus for firing events.
-     *
-     * @param eventBus the event bus
-     */
     public void setEventBus(@Nullable SimpleEventBus eventBus) {
         this.eventBus = eventBus;
     }
@@ -132,12 +128,10 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
 
     @Override
     public void playAnimation(@NotNull Animation animation) {
-        // Armor stands don't support animations
     }
 
     @Override
     public void playAnimation(@NotNull Viewer viewer, @NotNull Animation animation) {
-        // Armor stands don't support animations
     }
 
     @Override
@@ -145,33 +139,26 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
         syncMetadataToWrapper();
     }
 
-    /**
-     * Syncs metadata to the EntityLib wrapper.
-     */
     public void syncMetadataToWrapper() {
         if (wrapperEntity == null) {
             return;
         }
 
         wrapperEntity.consumeEntityMeta(ArmorStandMeta.class, meta -> {
-            // Base entity flags
             meta.setOnFire(armorStandAppearance.isOnFire());
             meta.setInvisible(armorStandAppearance.isInvisible());
             meta.setGlowing(armorStandAppearance.isGlowing());
 
-            // Custom name
             if (!armorStandAppearance.getCustomName().isEmpty()) {
                 meta.setCustomName(Component.text(armorStandAppearance.getCustomName()));
                 meta.setCustomNameVisible(armorStandAppearance.isCustomNameVisible());
             }
 
-            // Armor stand specific
             meta.setSmall(armorStandAppearance.isSmall());
             meta.setHasArms(armorStandAppearance.hasArms());
             meta.setHasNoBasePlate(!armorStandAppearance.hasBasePlate());
             meta.setMarker(armorStandAppearance.isMarker());
 
-            // Rotations
             ArmorStandAppearance.Rotation head = armorStandAppearance.getHeadRotation();
             meta.setHeadRotation(new Vector3f(head.pitch(), head.yaw(), head.roll()));
 
@@ -194,9 +181,6 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
         wrapperEntity.refresh();
     }
 
-    /**
-     * Syncs equipment to all viewers.
-     */
     public void syncEquipment() {
         if (wrapperEntity == null) {
             return;
@@ -207,16 +191,15 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
         for (ArmorStandAppearance.EquipmentSlot slot : ArmorStandAppearance.EquipmentSlot.values()) {
             Object item = armorStandAppearance.getEquipment(slot);
             if (item instanceof org.bukkit.inventory.ItemStack bukkitItem) {
-                com.github.retrooper.packetevents.protocol.item.ItemStack peItem =
-                        io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
+                ItemStack peItem = SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
 
-                com.github.retrooper.packetevents.protocol.player.EquipmentSlot peSlot = switch (slot) {
-                    case MAIN_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.MAIN_HAND;
-                    case OFF_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.OFF_HAND;
-                    case HEAD -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.HELMET;
-                    case CHEST -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.CHEST_PLATE;
-                    case LEGS -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.LEGGINGS;
-                    case FEET -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.BOOTS;
+                EquipmentSlot peSlot = switch (slot) {
+                    case MAIN_HAND -> EquipmentSlot.MAIN_HAND;
+                    case OFF_HAND -> EquipmentSlot.OFF_HAND;
+                    case HEAD -> EquipmentSlot.HELMET;
+                    case CHEST -> EquipmentSlot.CHEST_PLATE;
+                    case LEGS -> EquipmentSlot.LEGGINGS;
+                    case FEET -> EquipmentSlot.BOOTS;
                 };
 
                 equipment.setItem(peSlot, peItem);
@@ -234,7 +217,7 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
 
         wrapperEntity.addViewer(paperViewer.getPlayer().getUniqueId());
 
-        var location = new com.github.retrooper.packetevents.protocol.world.Location(
+        Location location = new Location(
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
         wrapperEntity.spawn(location);
@@ -250,7 +233,7 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
     @Override
     protected void sendTeleportPackets() {
         if (wrapperEntity != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), position.yaw(), position.pitch()
             );
             wrapperEntity.teleport(location);
@@ -260,7 +243,7 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
     @Override
     protected void sendLookPackets(float yaw, float pitch) {
         if (wrapperEntity != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), yaw, pitch
             );
             wrapperEntity.teleport(location);
@@ -274,11 +257,6 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
         }
     }
 
-    /**
-     * Gets the EntityLib wrapper entity.
-     *
-     * @return the wrapper entity
-     */
     public WrapperLivingEntity getWrapperEntity() {
         return wrapperEntity;
     }

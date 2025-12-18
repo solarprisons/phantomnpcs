@@ -1,5 +1,6 @@
 package prisons.solar.npclib.paper.npc;
 
+import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.world.states.WrappedBlockState;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
@@ -8,24 +9,21 @@ import me.tofaa.entitylib.meta.display.BlockDisplayMeta;
 import org.bukkit.block.data.BlockData;
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.appearance.BlockDisplayAppearance;
-import prisons.solar.npclib.api.entity.EntityType;
+import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.npc.Position;
 
-/**
- * Block display NPC implementation using EntityLib.
- */
 public class EntityLibBlockDisplayNPC extends AbstractEntityLibDisplayNPC<BlockDisplayAppearance> {
 
     private final EntityLibBlockDisplayAppearance blockDisplayAppearance;
 
     public EntityLibBlockDisplayNPC(@NotNull Position position) {
-        super(EntityType.BLOCK_DISPLAY, position);
+        super(prisons.solar.npclib.api.entity.EntityType.BLOCK_DISPLAY, position);
         this.blockDisplayAppearance = new EntityLibBlockDisplayAppearance(this);
         this.appearance = blockDisplayAppearance;
     }
 
     @Override
-    protected com.github.retrooper.packetevents.protocol.entity.type.EntityType getPacketEventsEntityType() {
+    protected EntityType getPacketEventsEntityType() {
         return EntityTypes.BLOCK_DISPLAY;
     }
 
@@ -50,12 +48,10 @@ public class EntityLibBlockDisplayNPC extends AbstractEntityLibDisplayNPC<BlockD
         }
 
         wrapperEntity.consumeEntityMeta(BlockDisplayMeta.class, meta -> {
-            // Base entity flags
             meta.setOnFire(blockDisplayAppearance.isOnFire());
             meta.setInvisible(blockDisplayAppearance.isInvisible());
             meta.setGlowing(blockDisplayAppearance.isGlowing());
 
-            // Display common properties
             meta.setBillboardConstraints(convertBillboard(blockDisplayAppearance.getBillboardMode()));
             meta.setTransformationInterpolationDuration(blockDisplayAppearance.getInterpolationDuration());
             meta.setInterpolationDelay(blockDisplayAppearance.getInterpolationDelay());
@@ -65,7 +61,6 @@ public class EntityLibBlockDisplayNPC extends AbstractEntityLibDisplayNPC<BlockD
             meta.setWidth(blockDisplayAppearance.getDisplayWidth());
             meta.setHeight(blockDisplayAppearance.getDisplayHeight());
 
-            // Block-specific properties
             Object block = blockDisplayAppearance.getBlock();
             if (block instanceof BlockData bukkitBlockData) {
                 WrappedBlockState state = SpigotConversionUtil.fromBukkitBlockData(bukkitBlockData);
@@ -76,8 +71,7 @@ public class EntityLibBlockDisplayNPC extends AbstractEntityLibDisplayNPC<BlockD
         wrapperEntity.refresh();
     }
 
-    private AbstractDisplayMeta.BillboardConstraints convertBillboard(
-            prisons.solar.npclib.api.appearance.DisplayAppearance.BillboardMode mode) {
+    private AbstractDisplayMeta.BillboardConstraints convertBillboard(DisplayAppearance.BillboardMode mode) {
         return switch (mode) {
             case FIXED -> AbstractDisplayMeta.BillboardConstraints.FIXED;
             case VERTICAL -> AbstractDisplayMeta.BillboardConstraints.VERTICAL;

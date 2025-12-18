@@ -4,12 +4,22 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType.Play;
+import com.github.retrooper.packetevents.protocol.player.Equipment;
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
+import com.github.retrooper.packetevents.protocol.player.GameMode;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
+import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.*;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType;
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.viewer.Viewer;
 import prisons.solar.npclib.protocol.adapter.ProtocolAdapter;
 import prisons.solar.npclib.protocol.packet.*;
@@ -132,11 +142,11 @@ public class PacketEventsAdapter implements ProtocolAdapter {
     }
 
     private WrapperPlayServerSpawnEntity translateSpawnPlayer(SpawnPlayerPacket packet) {
-        var position = new com.github.retrooper.packetevents.util.Vector3d(packet.x(), packet.y(), packet.z());
+        var position = new Vector3d(packet.x(), packet.y(), packet.z());
         return new WrapperPlayServerSpawnEntity(
                 packet.entityId(),
                 java.util.Optional.of(packet.uuid()),
-                com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PLAYER,
+                EntityTypes.PLAYER,
                 position,
                 fromProtocolAngle(packet.pitch()),
                 fromProtocolAngle(packet.yaw()),
@@ -148,7 +158,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
 
     private WrapperPlayServerSpawnEntity translateSpawnEntity(SpawnEntityPacket packet) {
         var entityType = mapEntityType(packet.entityType());
-        var position = new com.github.retrooper.packetevents.util.Vector3d(packet.x(), packet.y(), packet.z());
+        var position = new Vector3d(packet.x(), packet.y(), packet.z());
         return new WrapperPlayServerSpawnEntity(
                 packet.entityId(),
                 java.util.Optional.of(packet.uuid()),
@@ -191,7 +201,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
                     profile,
                     entry.listed(),
                     entry.latency(),
-                    com.github.retrooper.packetevents.protocol.player.GameMode.SURVIVAL,
+                    GameMode.SURVIVAL,
                     null,
                     null
             );
@@ -206,7 +216,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
     }
 
     private WrapperPlayServerEntityTeleport translateTeleport(EntityTeleportPacket packet) {
-        var position = new com.github.retrooper.packetevents.util.Vector3d(packet.x(), packet.y(), packet.z());
+        var position = new Vector3d(packet.x(), packet.y(), packet.z());
         return new WrapperPlayServerEntityTeleport(
                 packet.entityId(),
                 position,
@@ -221,7 +231,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
     }
 
     private WrapperPlayServerEntityMetadata translateMetadata(EntityMetadataPacket packet) {
-        List<com.github.retrooper.packetevents.protocol.entity.data.EntityData> data = new ArrayList<>();
+        List<EntityData> data = new ArrayList<>();
         for (EntityMetadataPacket.Entry entry : packet.entries()) {
             // Simplified - full implementation would map all metadata types
             var entityData = createEntityData(entry);
@@ -232,43 +242,30 @@ public class PacketEventsAdapter implements ProtocolAdapter {
         return new WrapperPlayServerEntityMetadata(packet.entityId(), data);
     }
 
-    private com.github.retrooper.packetevents.protocol.entity.data.EntityData createEntityData(EntityMetadataPacket.Entry entry) {
-        var dataTypes = com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.class;
+    private EntityData createEntityData(EntityMetadataPacket.Entry entry) {
         return switch (entry.type()) {
-            case BYTE -> new com.github.retrooper.packetevents.protocol.entity.data.EntityData(
-                    entry.index(),
-                    com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BYTE,
-                    entry.value()
-            );
-            case BOOLEAN -> new com.github.retrooper.packetevents.protocol.entity.data.EntityData(
-                    entry.index(),
-                    com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.BOOLEAN,
-                    entry.value()
-            );
-            case STRING -> new com.github.retrooper.packetevents.protocol.entity.data.EntityData(
-                    entry.index(),
-                    com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes.STRING,
-                    entry.value()
-            );
+            case BYTE -> new EntityData(entry.index(), EntityDataTypes.BYTE, entry.value());
+            case BOOLEAN -> new EntityData(entry.index(), EntityDataTypes.BOOLEAN, entry.value());
+            case STRING -> new EntityData(entry.index(), EntityDataTypes.STRING, entry.value());
             default -> null;
         };
     }
 
     private WrapperPlayServerEntityEquipment translateEquipment(EntityEquipmentPacket packet) {
-        List<com.github.retrooper.packetevents.protocol.player.Equipment> equipment = new ArrayList<>();
+        List<Equipment> equipment = new ArrayList<>();
         for (EntityEquipmentPacket.Entry entry : packet.equipment()) {
             var slot = mapEquipmentSlot(entry.slot());
             // Item needs to be converted from platform-specific to PacketEvents ItemStack
             var item = entry.item() != null
-                    ? com.github.retrooper.packetevents.protocol.item.ItemStack.builder().build()
-                    : com.github.retrooper.packetevents.protocol.item.ItemStack.EMPTY;
-            equipment.add(new com.github.retrooper.packetevents.protocol.player.Equipment(slot, item));
+                    ? ItemStack.builder().build()
+                    : ItemStack.EMPTY;
+            equipment.add(new Equipment(slot, item));
         }
         return new WrapperPlayServerEntityEquipment(packet.entityId(), equipment);
     }
 
     private WrapperPlayServerEntityAnimation translateAnimation(EntityAnimationPacket packet) {
-        var type = com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType.values()[packet.animation()];
+        var type = EntityAnimationType.values()[packet.animation()];
         return new WrapperPlayServerEntityAnimation(packet.entityId(), type);
     }
 
@@ -281,28 +278,28 @@ public class PacketEventsAdapter implements ProtocolAdapter {
         );
     }
 
-    private com.github.retrooper.packetevents.protocol.entity.type.EntityType mapEntityType(prisons.solar.npclib.api.entity.EntityType type) {
+    private com.github.retrooper.packetevents.protocol.entity.type.EntityType mapEntityType(EntityType type) {
         return switch (type) {
-            case PLAYER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PLAYER;
-            case ZOMBIE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ZOMBIE;
-            case SKELETON -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SKELETON;
-            case VILLAGER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.VILLAGER;
-            case ARMOR_STAND -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ARMOR_STAND;
-            case TEXT_DISPLAY -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.TEXT_DISPLAY;
-            case BLOCK_DISPLAY -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.BLOCK_DISPLAY;
-            case ITEM_DISPLAY -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ITEM_DISPLAY;
-            default -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ZOMBIE;
+            case PLAYER -> EntityTypes.PLAYER;
+            case ZOMBIE -> EntityTypes.ZOMBIE;
+            case SKELETON -> EntityTypes.SKELETON;
+            case VILLAGER -> EntityTypes.VILLAGER;
+            case ARMOR_STAND -> EntityTypes.ARMOR_STAND;
+            case TEXT_DISPLAY -> EntityTypes.TEXT_DISPLAY;
+            case BLOCK_DISPLAY -> EntityTypes.BLOCK_DISPLAY;
+            case ITEM_DISPLAY -> EntityTypes.ITEM_DISPLAY;
+            default -> EntityTypes.ZOMBIE;
         };
     }
 
-    private com.github.retrooper.packetevents.protocol.player.EquipmentSlot mapEquipmentSlot(EntityEquipmentPacket.Slot slot) {
+    private EquipmentSlot mapEquipmentSlot(EntityEquipmentPacket.Slot slot) {
         return switch (slot) {
-            case MAIN_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.MAIN_HAND;
-            case OFF_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.OFF_HAND;
-            case FEET -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.BOOTS;
-            case LEGS -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.LEGGINGS;
-            case CHEST -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.CHEST_PLATE;
-            case HEAD -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.HELMET;
+            case MAIN_HAND -> EquipmentSlot.MAIN_HAND;
+            case OFF_HAND -> EquipmentSlot.OFF_HAND;
+            case FEET -> EquipmentSlot.BOOTS;
+            case LEGS -> EquipmentSlot.LEGGINGS;
+            case CHEST -> EquipmentSlot.CHEST_PLATE;
+            case HEAD -> EquipmentSlot.HELMET;
         };
     }
 }

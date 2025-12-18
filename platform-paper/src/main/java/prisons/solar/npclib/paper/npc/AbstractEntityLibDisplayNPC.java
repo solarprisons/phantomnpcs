@@ -1,8 +1,7 @@
 package prisons.solar.npclib.paper.npc;
 
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
-import com.github.retrooper.packetevents.util.Quaternion4f;
-import com.github.retrooper.packetevents.util.Vector3f;
+import com.github.retrooper.packetevents.protocol.world.Location;
 import me.tofaa.entitylib.meta.display.AbstractDisplayMeta;
 import me.tofaa.entitylib.wrapper.WrapperEntity;
 import org.jetbrains.annotations.NotNull;
@@ -17,11 +16,6 @@ import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
 
-/**
- * Abstract base class for display entity NPCs (text, block, item displays).
- *
- * @param <A> the appearance type
- */
 public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> extends AbstractNPC<A> {
 
     protected WrapperEntity wrapperEntity;
@@ -32,25 +26,10 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
         super(entityType, position);
     }
 
-    /**
-     * Gets the PacketEvents entity type for this display.
-     *
-     * @return the entity type
-     */
     protected abstract EntityType getPacketEventsEntityType();
 
-    /**
-     * Applies display-specific metadata to the wrapper.
-     *
-     * @param meta the display meta
-     */
     protected abstract void applySpecificMeta(AbstractDisplayMeta meta);
 
-    /**
-     * Sets the event bus for firing events.
-     *
-     * @param eventBus the event bus
-     */
     public void setEventBus(@Nullable SimpleEventBus eventBus) {
         this.eventBus = eventBus;
     }
@@ -145,12 +124,10 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
 
     @Override
     public void playAnimation(@NotNull Animation animation) {
-        // Display entities don't support animations
     }
 
     @Override
     public void playAnimation(@NotNull Viewer viewer, @NotNull Animation animation) {
-        // Display entities don't support animations
     }
 
     @Override
@@ -158,9 +135,6 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
         syncMetadataToWrapper();
     }
 
-    /**
-     * Syncs metadata to the EntityLib wrapper.
-     */
     @SuppressWarnings("unchecked")
     public void syncMetadataToWrapper() {
         if (wrapperEntity == null) {
@@ -170,12 +144,10 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
         wrapperEntity.consumeEntityMeta(AbstractDisplayMeta.class, meta -> {
             DisplayAppearance displayAppearance = appearance();
 
-            // Base entity flags
             meta.setOnFire(displayAppearance.isOnFire());
             meta.setInvisible(displayAppearance.isInvisible());
             meta.setGlowing(displayAppearance.isGlowing());
 
-            // Display common properties
             meta.setBillboardConstraints(convertBillboard(displayAppearance.getBillboardMode()));
             meta.setTransformationInterpolationDuration(displayAppearance.getInterpolationDuration());
             meta.setInterpolationDelay(displayAppearance.getInterpolationDelay());
@@ -185,22 +157,18 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
             meta.setWidth(displayAppearance.getDisplayWidth());
             meta.setHeight(displayAppearance.getDisplayHeight());
 
-            // Brightness (combine block and sky into single int)
             Integer blockBrightness = displayAppearance.getBlockBrightness();
             Integer skyBrightness = displayAppearance.getSkyBrightness();
             if (blockBrightness != null && skyBrightness != null) {
-                // Pack brightness: (blockLight << 4) | (skyLight << 20)
                 int packed = (blockBrightness & 0xF) << 4 | (skyBrightness & 0xF) << 20;
                 meta.setBrightnessOverride(packed);
             }
 
-            // Glow color
             Integer glowColor = displayAppearance.getGlowColorOverride();
             if (glowColor != null) {
                 meta.setGlowColorOverride(glowColor);
             }
 
-            // Apply subclass-specific metadata
             applySpecificMeta(meta);
         });
 
@@ -217,7 +185,7 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
 
         wrapperEntity.addViewer(paperViewer.getPlayer().getUniqueId());
 
-        var location = new com.github.retrooper.packetevents.protocol.world.Location(
+        Location location = new Location(
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
         wrapperEntity.spawn(location);
@@ -233,7 +201,7 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
     @Override
     protected void sendTeleportPackets() {
         if (wrapperEntity != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), position.yaw(), position.pitch()
             );
             wrapperEntity.teleport(location);
@@ -243,7 +211,7 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
     @Override
     protected void sendLookPackets(float yaw, float pitch) {
         if (wrapperEntity != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), yaw, pitch
             );
             wrapperEntity.teleport(location);
@@ -266,11 +234,6 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
         };
     }
 
-    /**
-     * Gets the EntityLib wrapper entity.
-     *
-     * @return the wrapper entity
-     */
     public WrapperEntity getWrapperEntity() {
         return wrapperEntity;
     }

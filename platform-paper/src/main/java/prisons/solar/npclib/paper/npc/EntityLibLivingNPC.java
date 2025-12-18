@@ -1,7 +1,12 @@
 package prisons.solar.npclib.paper.npc;
 
+import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
+import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
+import com.github.retrooper.packetevents.protocol.world.Location;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType;
-import me.tofaa.entitylib.meta.EntityMeta;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.types.LivingEntityMeta;
 import me.tofaa.entitylib.wrapper.WrapperLivingEntity;
 import net.kyori.adventure.text.Component;
@@ -18,10 +23,6 @@ import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
 
-/**
- * Living entity NPC implementation using EntityLib.
- * Supports all mob types (zombies, villagers, animals, etc).
- */
 public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
 
     private WrapperLivingEntity wrapperEntity;
@@ -34,11 +35,6 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
         this.appearance = livingAppearance;
     }
 
-    /**
-     * Sets the event bus for firing events.
-     *
-     * @param eventBus the event bus
-     */
     public void setEventBus(@Nullable SimpleEventBus eventBus) {
         this.eventBus = eventBus;
     }
@@ -57,7 +53,6 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
             return;
         }
 
-        // Fire spawn event
         if (eventBus != null) {
             SimpleNPCSpawnEvent event = new SimpleNPCSpawnEvent(this, viewer);
             eventBus.post(event);
@@ -158,9 +153,6 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
         syncMetadataToWrapper();
     }
 
-    /**
-     * Syncs metadata to the EntityLib wrapper.
-     */
     public void syncMetadataToWrapper() {
         if (wrapperEntity == null) {
             return;
@@ -182,9 +174,6 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
         wrapperEntity.refresh();
     }
 
-    /**
-     * Syncs equipment to all viewers.
-     */
     public void syncEquipment() {
         if (wrapperEntity == null) {
             return;
@@ -195,16 +184,15 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
         for (LivingAppearance.EquipmentSlot slot : LivingAppearance.EquipmentSlot.values()) {
             Object item = livingAppearance.getEquipment(slot);
             if (item instanceof org.bukkit.inventory.ItemStack bukkitItem) {
-                com.github.retrooper.packetevents.protocol.item.ItemStack peItem =
-                        io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
+                ItemStack peItem = SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
 
-                com.github.retrooper.packetevents.protocol.player.EquipmentSlot peSlot = switch (slot) {
-                    case MAIN_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.MAIN_HAND;
-                    case OFF_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.OFF_HAND;
-                    case HEAD -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.HELMET;
-                    case CHEST -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.CHEST_PLATE;
-                    case LEGS -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.LEGGINGS;
-                    case FEET -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.BOOTS;
+                EquipmentSlot peSlot = switch (slot) {
+                    case MAIN_HAND -> EquipmentSlot.MAIN_HAND;
+                    case OFF_HAND -> EquipmentSlot.OFF_HAND;
+                    case HEAD -> EquipmentSlot.HELMET;
+                    case CHEST -> EquipmentSlot.CHEST_PLATE;
+                    case LEGS -> EquipmentSlot.LEGGINGS;
+                    case FEET -> EquipmentSlot.BOOTS;
                 };
 
                 equipment.setItem(peSlot, peItem);
@@ -222,7 +210,7 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
 
         wrapperEntity.addViewer(paperViewer.getPlayer().getUniqueId());
 
-        var location = new com.github.retrooper.packetevents.protocol.world.Location(
+        Location location = new Location(
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
         wrapperEntity.spawn(location);
@@ -238,7 +226,7 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
     @Override
     protected void sendTeleportPackets() {
         if (wrapperEntity != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), position.yaw(), position.pitch()
             );
             wrapperEntity.teleport(location);
@@ -248,8 +236,7 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
     @Override
     protected void sendLookPackets(float yaw, float pitch) {
         if (wrapperEntity != null) {
-            // Living entities use teleport for rotation
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), yaw, pitch
             );
             wrapperEntity.teleport(location);
@@ -265,72 +252,65 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
     }
 
     private com.github.retrooper.packetevents.protocol.entity.type.EntityType convertEntityType(EntityType type) {
-        // Map our EntityType to PacketEvents EntityType
         return switch (type) {
-            case ZOMBIE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ZOMBIE;
-            case SKELETON -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SKELETON;
-            case CREEPER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.CREEPER;
-            case VILLAGER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.VILLAGER;
-            case IRON_GOLEM -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.IRON_GOLEM;
-            case SNOW_GOLEM -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SNOW_GOLEM;
-            case WITCH -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.WITCH;
-            case PILLAGER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PILLAGER;
-            case VINDICATOR -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.VINDICATOR;
-            case EVOKER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.EVOKER;
-            case ENDERMAN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ENDERMAN;
-            case PIGLIN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PIGLIN;
-            case PIGLIN_BRUTE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PIGLIN_BRUTE;
-            case ZOMBIFIED_PIGLIN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ZOMBIFIED_PIGLIN;
-            case BLAZE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.BLAZE;
-            case WITHER_SKELETON -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.WITHER_SKELETON;
-            case GUARDIAN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.GUARDIAN;
-            case ELDER_GUARDIAN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ELDER_GUARDIAN;
-            case SHULKER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SHULKER;
-            case WARDEN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.WARDEN;
-            case ALLAY -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ALLAY;
-            case VEX -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.VEX;
-            case COW -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.COW;
-            case PIG -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PIG;
-            case SHEEP -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SHEEP;
-            case CHICKEN -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.CHICKEN;
-            case WOLF -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.WOLF;
-            case CAT -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.CAT;
-            case HORSE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.HORSE;
-            case DONKEY -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.DONKEY;
-            case MULE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.MULE;
-            case LLAMA -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.LLAMA;
-            case FOX -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.FOX;
-            case PANDA -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.PANDA;
-            case BEE -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.BEE;
-            case FROG -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.FROG;
-            case AXOLOTL -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.AXOLOTL;
-            case GOAT -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.GOAT;
-            case CAMEL -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.CAMEL;
-            case SNIFFER -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.SNIFFER;
-            case ARMADILLO -> com.github.retrooper.packetevents.protocol.entity.type.EntityTypes.ARMADILLO;
+            case ZOMBIE -> EntityTypes.ZOMBIE;
+            case SKELETON -> EntityTypes.SKELETON;
+            case CREEPER -> EntityTypes.CREEPER;
+            case VILLAGER -> EntityTypes.VILLAGER;
+            case IRON_GOLEM -> EntityTypes.IRON_GOLEM;
+            case SNOW_GOLEM -> EntityTypes.SNOW_GOLEM;
+            case WITCH -> EntityTypes.WITCH;
+            case PILLAGER -> EntityTypes.PILLAGER;
+            case VINDICATOR -> EntityTypes.VINDICATOR;
+            case EVOKER -> EntityTypes.EVOKER;
+            case ENDERMAN -> EntityTypes.ENDERMAN;
+            case PIGLIN -> EntityTypes.PIGLIN;
+            case PIGLIN_BRUTE -> EntityTypes.PIGLIN_BRUTE;
+            case ZOMBIFIED_PIGLIN -> EntityTypes.ZOMBIFIED_PIGLIN;
+            case BLAZE -> EntityTypes.BLAZE;
+            case WITHER_SKELETON -> EntityTypes.WITHER_SKELETON;
+            case GUARDIAN -> EntityTypes.GUARDIAN;
+            case ELDER_GUARDIAN -> EntityTypes.ELDER_GUARDIAN;
+            case SHULKER -> EntityTypes.SHULKER;
+            case WARDEN -> EntityTypes.WARDEN;
+            case ALLAY -> EntityTypes.ALLAY;
+            case VEX -> EntityTypes.VEX;
+            case COW -> EntityTypes.COW;
+            case PIG -> EntityTypes.PIG;
+            case SHEEP -> EntityTypes.SHEEP;
+            case CHICKEN -> EntityTypes.CHICKEN;
+            case WOLF -> EntityTypes.WOLF;
+            case CAT -> EntityTypes.CAT;
+            case HORSE -> EntityTypes.HORSE;
+            case DONKEY -> EntityTypes.DONKEY;
+            case MULE -> EntityTypes.MULE;
+            case LLAMA -> EntityTypes.LLAMA;
+            case FOX -> EntityTypes.FOX;
+            case PANDA -> EntityTypes.PANDA;
+            case BEE -> EntityTypes.BEE;
+            case FROG -> EntityTypes.FROG;
+            case AXOLOTL -> EntityTypes.AXOLOTL;
+            case GOAT -> EntityTypes.GOAT;
+            case CAMEL -> EntityTypes.CAMEL;
+            case SNIFFER -> EntityTypes.SNIFFER;
+            case ARMADILLO -> EntityTypes.ARMADILLO;
             default -> throw new UnsupportedOperationException("Entity type not supported: " + type);
         };
     }
 
-    private com.github.retrooper.packetevents.protocol.entity.pose.EntityPose convertPose(
-            LivingAppearance.EntityPose pose) {
+    private EntityPose convertPose(LivingAppearance.EntityPose pose) {
         return switch (pose) {
-            case STANDING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.STANDING;
-            case FALL_FLYING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.FALL_FLYING;
-            case SLEEPING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SLEEPING;
-            case SWIMMING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SWIMMING;
-            case SPIN_ATTACK -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SPIN_ATTACK;
-            case SNEAKING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.CROUCHING;
-            case DYING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.DYING;
-            default -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.STANDING;
+            case STANDING -> EntityPose.STANDING;
+            case FALL_FLYING -> EntityPose.FALL_FLYING;
+            case SLEEPING -> EntityPose.SLEEPING;
+            case SWIMMING -> EntityPose.SWIMMING;
+            case SPIN_ATTACK -> EntityPose.SPIN_ATTACK;
+            case SNEAKING -> EntityPose.CROUCHING;
+            case DYING -> EntityPose.DYING;
+            default -> EntityPose.STANDING;
         };
     }
 
-    /**
-     * Gets the EntityLib wrapper entity.
-     *
-     * @return the wrapper entity
-     */
     public WrapperLivingEntity getWrapperEntity() {
         return wrapperEntity;
     }

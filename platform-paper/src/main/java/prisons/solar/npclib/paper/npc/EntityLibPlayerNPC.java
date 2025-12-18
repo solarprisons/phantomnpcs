@@ -1,13 +1,20 @@
 package prisons.solar.npclib.paper.npc;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
+import com.github.retrooper.packetevents.protocol.world.Location;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.types.PlayerMeta;
 import me.tofaa.entitylib.wrapper.WrapperPlayer;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.appearance.PlayerAppearance;
@@ -26,15 +33,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Player NPC implementation using EntityLib.
- * Handles all packet-level details for player NPCs including:
- * - Skin application and fetching
- * - Tab list management (add briefly then remove)
- * - Equipment synchronization
- * - Metadata updates
- * - Animations
- */
 public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
 
     private WrapperPlayer wrapperPlayer;
@@ -43,7 +41,6 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
     private SkinManager skinManager;
     private SimpleEventBus eventBus;
 
-    // Tab list configuration
     private static final long TAB_LIST_REMOVE_DELAY_MS = 50;
     private boolean removeFromTabList = true;
 
@@ -53,30 +50,15 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
         this.appearance = playerAppearance;
     }
 
-    /**
-     * Sets the skin manager for fetching skins.
-     *
-     * @param skinManager the skin manager
-     */
     public void setSkinManager(@Nullable SkinManager skinManager) {
         this.skinManager = skinManager;
         this.playerAppearance.setSkinManager(skinManager);
     }
 
-    /**
-     * Sets the event bus for firing events.
-     *
-     * @param eventBus the event bus
-     */
     public void setEventBus(@Nullable SimpleEventBus eventBus) {
         this.eventBus = eventBus;
     }
 
-    /**
-     * Sets whether to remove this NPC from the tab list after spawning.
-     *
-     * @param remove true to remove from tab list
-     */
     public void setRemoveFromTabList(boolean remove) {
         this.removeFromTabList = remove;
     }
@@ -95,7 +77,6 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
             return;
         }
 
-        // Fire spawn event
         if (eventBus != null) {
             SimpleNPCSpawnEvent event = new SimpleNPCSpawnEvent(this, viewer);
             eventBus.post(event);
@@ -116,7 +97,6 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
             return;
         }
         for (Viewer viewer : viewers) {
-            // Fire despawn event
             if (eventBus != null) {
                 eventBus.post(new SimpleNPCDespawnEvent(this, viewer));
             }
@@ -129,7 +109,6 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
     @Override
     public void despawn(@NotNull Viewer viewer) {
         if (viewers.remove(viewer)) {
-            // Fire despawn event
             if (eventBus != null) {
                 eventBus.post(new SimpleNPCDespawnEvent(this, viewer));
             }
@@ -199,70 +178,73 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
         syncMetadataToWrapper();
     }
 
-    /**
-     * Syncs all appearance/metadata to the EntityLib wrapper.
-     */
     public void syncMetadataToWrapper() {
         if (wrapperPlayer == null) {
             return;
         }
 
-        // Update player meta
         wrapperPlayer.consumeEntityMeta(PlayerMeta.class, meta -> {
-            // Skin layers - set individual skin parts visibility
-            byte skinMask = playerAppearance.getSkinLayerMask();
-            meta.setCapeEnabled((skinMask & 0x01) != 0);
-            meta.setJacketEnabled((skinMask & 0x02) != 0);
-            meta.setLeftSleeveEnabled((skinMask & 0x04) != 0);
-            meta.setRightSleeveEnabled((skinMask & 0x08) != 0);
-            meta.setLeftLegEnabled((skinMask & 0x10) != 0);
-            meta.setRightLegEnabled((skinMask & 0x20) != 0);
-            meta.setHatEnabled((skinMask & 0x40) != 0);
+            // Skip EntityLib's skin layer methods - they use wrong indices for 1.21.x
+            // We'll send skin parts manually below with correct index 16
 
-            // Base entity flags
             meta.setOnFire(playerAppearance.isOnFire());
             meta.setInvisible(playerAppearance.isInvisible());
             meta.setGlowing(playerAppearance.isGlowing());
 
-            // Custom name
             if (!playerAppearance.getCustomName().isEmpty()) {
                 meta.setCustomName(Component.text(playerAppearance.getCustomName()));
                 meta.setCustomNameVisible(playerAppearance.isCustomNameVisible());
             }
 
-            // Pose
             meta.setPose(convertPose(playerAppearance.getPose()));
         });
 
-        // Refresh metadata to viewers
         wrapperPlayer.refresh();
     }
 
     /**
-     * Syncs equipment to all viewers.
+     * Sends skin layer metadata directly using PacketEvents with correct index.
+     * EntityLib uses wrong indices for 1.21.x (sends to index 17 instead of 16).
      */
+    public void sendSkinLayersPacket() {
+        if (wrapperPlayer == null) {
+            return;
+        }
+
+        byte skinMask = playerAppearance.getSkinLayerMask();
+        // Index 16 = Displayed Skin Parts (Byte) per MC protocol wiki
+        EntityData skinData = new EntityData(16, EntityDataTypes.BYTE, skinMask);
+        WrapperPlayServerEntityMetadata packet = new WrapperPlayServerEntityMetadata(
+                entityId, List.of(skinData)
+        );
+
+        for (Viewer viewer : viewers) {
+            if (viewer instanceof PaperViewer paperViewer) {
+                PacketEvents.getAPI().getPlayerManager()
+                        .sendPacket(paperViewer.getPlayer(), packet);
+            }
+        }
+    }
+
     public void syncEquipment() {
         if (wrapperPlayer == null) {
             return;
         }
 
-        // EntityLib handles equipment through WrapperEntityEquipment
         var equipment = wrapperPlayer.getEquipment();
 
-        // Convert our equipment to PacketEvents format
         for (PlayerAppearance.EquipmentSlot slot : PlayerAppearance.EquipmentSlot.values()) {
             Object item = playerAppearance.getEquipment(slot);
             if (item instanceof org.bukkit.inventory.ItemStack bukkitItem) {
-                com.github.retrooper.packetevents.protocol.item.ItemStack peItem =
-                        io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
+                ItemStack peItem = SpigotConversionUtil.fromBukkitItemStack(bukkitItem);
 
-                com.github.retrooper.packetevents.protocol.player.EquipmentSlot peSlot = switch (slot) {
-                    case MAIN_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.MAIN_HAND;
-                    case OFF_HAND -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.OFF_HAND;
-                    case HEAD -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.HELMET;
-                    case CHEST -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.CHEST_PLATE;
-                    case LEGS -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.LEGGINGS;
-                    case FEET -> com.github.retrooper.packetevents.protocol.player.EquipmentSlot.BOOTS;
+                EquipmentSlot peSlot = switch (slot) {
+                    case MAIN_HAND -> EquipmentSlot.MAIN_HAND;
+                    case OFF_HAND -> EquipmentSlot.OFF_HAND;
+                    case HEAD -> EquipmentSlot.HELMET;
+                    case CHEST -> EquipmentSlot.CHEST_PLATE;
+                    case LEGS -> EquipmentSlot.LEGGINGS;
+                    case FEET -> EquipmentSlot.BOOTS;
                 };
 
                 equipment.setItem(peSlot, peItem);
@@ -278,22 +260,31 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
 
         ensureWrapperPlayer();
 
-        // Add viewer
-        wrapperPlayer.addViewer(paperViewer.getPlayer().getUniqueId());
-
-        // Spawn at location
-        var location = new com.github.retrooper.packetevents.protocol.world.Location(
+        Location location = new Location(
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
-        wrapperPlayer.spawn(location);
 
-        // Schedule tab list removal if configured
+        // Spawn the entity first if not already spawned
+        if (!wrapperPlayer.isSpawned()) {
+            wrapperPlayer.spawn(location);
+        }
+
+        // Add viewer - EntityLib will send spawn packets to this viewer
+        wrapperPlayer.addViewer(paperViewer.getPlayer().getUniqueId());
+
+        // Send skin layers with correct metadata index (16) - EntityLib uses wrong index
+        byte skinMask = playerAppearance.getSkinLayerMask();
+        EntityData skinData = new EntityData(16, EntityDataTypes.BYTE, skinMask);
+        WrapperPlayServerEntityMetadata skinPacket = new WrapperPlayServerEntityMetadata(
+                entityId, List.of(skinData)
+        );
+        PacketEvents.getAPI().getPlayerManager().sendPacket(paperViewer.getPlayer(), skinPacket);
+
         if (removeFromTabList) {
             CompletableFuture.delayedExecutor(TAB_LIST_REMOVE_DELAY_MS, TimeUnit.MILLISECONDS)
                     .execute(() -> {
                         if (wrapperPlayer != null) {
                             wrapperPlayer.setInTablist(false);
-                            // Send tab list remove packet
                             var removePacket = wrapperPlayer.tabListRemovePacket();
                             if (removePacket != null) {
                                 PacketEvents.getAPI().getPlayerManager()
@@ -314,7 +305,7 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
     @Override
     protected void sendTeleportPackets() {
         if (wrapperPlayer != null) {
-            var location = new com.github.retrooper.packetevents.protocol.world.Location(
+            Location location = new Location(
                     position.x(), position.y(), position.z(), position.yaw(), position.pitch()
             );
             wrapperPlayer.teleport(location);
@@ -330,10 +321,8 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
 
     private void ensureWrapperPlayer() {
         if (wrapperPlayer == null) {
-            // Create user profile with skin if available
             UserProfile profile = new UserProfile(id, playerAppearance.getDisplayName());
 
-            // Apply skin textures
             PlayerAppearance.Skin skin = playerAppearance.getSkin();
             if (skin != null) {
                 List<TextureProperty> textures = SkinManager.toTextureProperties(skin);
@@ -343,60 +332,40 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
             wrapperPlayer = new WrapperPlayer(profile, entityId);
             wrapperPlayer.setInTablist(true);
 
-            // Sync metadata
             syncMetadataToWrapper();
         }
     }
 
-    private com.github.retrooper.packetevents.protocol.entity.pose.EntityPose convertPose(
-            PlayerAppearance.EntityPose pose) {
+    private EntityPose convertPose(PlayerAppearance.EntityPose pose) {
         return switch (pose) {
-            case STANDING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.STANDING;
-            case FALL_FLYING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.FALL_FLYING;
-            case SLEEPING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SLEEPING;
-            case SWIMMING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SWIMMING;
-            case SPIN_ATTACK -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.SPIN_ATTACK;
-            case SNEAKING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.CROUCHING;
-            case DYING -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.DYING;
-            default -> com.github.retrooper.packetevents.protocol.entity.pose.EntityPose.STANDING;
+            case STANDING -> EntityPose.STANDING;
+            case FALL_FLYING -> EntityPose.FALL_FLYING;
+            case SLEEPING -> EntityPose.SLEEPING;
+            case SWIMMING -> EntityPose.SWIMMING;
+            case SPIN_ATTACK -> EntityPose.SPIN_ATTACK;
+            case SNEAKING -> EntityPose.CROUCHING;
+            case DYING -> EntityPose.DYING;
+            default -> EntityPose.STANDING;
         };
     }
 
-    /**
-     * Gets the EntityLib wrapper player.
-     *
-     * @return the wrapper player
-     */
     public WrapperPlayer getWrapperPlayer() {
         return wrapperPlayer;
     }
 
-    /**
-     * Updates the skin and respawns for all viewers.
-     *
-     * @param skin the new skin
-     */
     public void updateSkin(@NotNull PlayerAppearance.Skin skin) {
         playerAppearance.setSkin(skin);
 
         if (wrapperPlayer != null) {
-            // Update textures
             wrapperPlayer.setTextureProperties(SkinManager.toTextureProperties(skin));
 
-            // Respawn for all viewers to show new skin
+            // Re-spawn for all viewers to apply the skin change
             for (Viewer viewer : viewers) {
                 if (viewer instanceof PaperViewer paperViewer) {
-                    // Remove and re-add to refresh skin
+                    // Remove and re-add viewer to trigger respawn with new skin
                     wrapperPlayer.removeViewer(paperViewer.getPlayer().getUniqueId());
                     wrapperPlayer.addViewer(paperViewer.getPlayer().getUniqueId());
 
-                    // Re-send spawn packets
-                    var location = new com.github.retrooper.packetevents.protocol.world.Location(
-                            position.x(), position.y(), position.z(), position.yaw(), position.pitch()
-                    );
-                    wrapperPlayer.spawn(location);
-
-                    // Schedule tab removal again
                     if (removeFromTabList) {
                         CompletableFuture.delayedExecutor(TAB_LIST_REMOVE_DELAY_MS, TimeUnit.MILLISECONDS)
                                 .execute(() -> {
