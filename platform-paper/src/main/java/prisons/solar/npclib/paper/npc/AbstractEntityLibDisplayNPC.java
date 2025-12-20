@@ -9,12 +9,14 @@ import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.npc.NPCState;
 import prisons.solar.npclib.api.npc.Position;
+import prisons.solar.npclib.api.status.EntityStatus;
 import prisons.solar.npclib.api.viewer.Viewer;
 import prisons.solar.npclib.core.event.SimpleEventBus;
 import prisons.solar.npclib.core.event.SimpleNPCDespawnEvent;
 import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
+import prisons.solar.npclib.paper.status.StatusHandlers;
 
 public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> extends AbstractNPC<A> {
 
@@ -123,11 +125,29 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
     }
 
     @Override
-    public void playAnimation(@NotNull Animation animation) {
+    public void playAnimation(@NotNull prisons.solar.npclib.api.animation.NPCAnimation animation) {
+        // Display entities do not support animations
     }
 
     @Override
-    public void playAnimation(@NotNull Viewer viewer, @NotNull Animation animation) {
+    public void playAnimation(@NotNull Viewer viewer, @NotNull prisons.solar.npclib.api.animation.NPCAnimation animation) {
+        // Display entities do not support animations
+    }
+
+    @Override
+    public void playStatus(@NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, viewers);
+    }
+
+    @Override
+    public void playStatus(@NotNull Viewer viewer, @NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, java.util.List.of(viewer));
     }
 
     @Override

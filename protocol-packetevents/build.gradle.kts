@@ -8,5 +8,5 @@ dependencies {
     api(project(":protocol"))
     api(project(":platform-api"))
 
-    compileOnly("com.github.retrooper:packetevents-spigot:2.7.0")
+    compileOnly("com.github.retrooper:packetevents-spigot:2.11.0")
 }

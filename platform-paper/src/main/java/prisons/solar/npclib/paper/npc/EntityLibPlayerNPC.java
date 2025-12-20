@@ -9,7 +9,6 @@ import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.protocol.world.Location;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.types.PlayerMeta;
@@ -17,19 +16,24 @@ import me.tofaa.entitylib.wrapper.WrapperPlayer;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.appearance.PlayerAppearance;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.npc.NPCState;
 import prisons.solar.npclib.api.npc.Position;
+import prisons.solar.npclib.api.status.EntityStatus;
 import prisons.solar.npclib.api.viewer.Viewer;
 import prisons.solar.npclib.core.event.SimpleEventBus;
 import prisons.solar.npclib.core.event.SimpleNPCDespawnEvent;
 import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
+import prisons.solar.npclib.paper.animation.AnimationHandlers;
 import prisons.solar.npclib.paper.skin.SkinManager;
+import prisons.solar.npclib.paper.status.StatusHandlers;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -152,25 +156,35 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
     }
 
     @Override
-    public void playAnimation(@NotNull Animation animation) {
-        for (Viewer viewer : viewers) {
-            playAnimation(viewer, animation);
+    public void playAnimation(@NotNull NPCAnimation animation) {
+        if (entityId == -1) {
+            return;
         }
+        AnimationHandlers.playAnimation(entityType, entityId, animation, viewers);
     }
 
     @Override
-    public void playAnimation(@NotNull Viewer viewer, @NotNull Animation animation) {
-        if (wrapperPlayer != null && viewer instanceof PaperViewer) {
-            EntityAnimationType animationType = switch (animation) {
-                case SWING_MAIN_ARM -> EntityAnimationType.SWING_MAIN_ARM;
-                case TAKE_DAMAGE -> EntityAnimationType.HURT;
-                case LEAVE_BED -> EntityAnimationType.WAKE_UP;
-                case SWING_OFFHAND -> EntityAnimationType.SWING_OFF_HAND;
-                case CRITICAL_EFFECT -> EntityAnimationType.CRITICAL_HIT;
-                case MAGIC_CRITICAL_EFFECT -> EntityAnimationType.MAGIC_CRITICAL_HIT;
-            };
-            wrapperPlayer.sendAnimation(animationType);
+    public void playAnimation(@NotNull Viewer viewer, @NotNull NPCAnimation animation) {
+        if (entityId == -1) {
+            return;
         }
+        AnimationHandlers.playAnimation(entityType, entityId, animation, java.util.List.of(viewer));
+    }
+
+    @Override
+    public void playStatus(@NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, viewers);
+    }
+
+    @Override
+    public void playStatus(@NotNull Viewer viewer, @NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, java.util.List.of(viewer));
     }
 
     @Override
@@ -382,5 +396,14 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
                 }
             }
         }
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+    @Override
+    public String getName() {
+        return "";
     }
 }

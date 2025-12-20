@@ -11,16 +11,22 @@ import me.tofaa.entitylib.wrapper.WrapperLivingEntity;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.appearance.ArmorStandAppearance;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.npc.NPCState;
 import prisons.solar.npclib.api.npc.Position;
+import prisons.solar.npclib.api.status.EntityStatus;
 import prisons.solar.npclib.api.viewer.Viewer;
 import prisons.solar.npclib.core.event.SimpleEventBus;
 import prisons.solar.npclib.core.event.SimpleNPCDespawnEvent;
 import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
 import prisons.solar.npclib.paper.PaperViewer;
+import prisons.solar.npclib.paper.animation.AnimationHandlers;
+import prisons.solar.npclib.paper.status.StatusHandlers;
+
+import java.util.UUID;
 
 public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
 
@@ -127,11 +133,35 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
     }
 
     @Override
-    public void playAnimation(@NotNull Animation animation) {
+    public void playAnimation(@NotNull NPCAnimation animation) {
+        if (entityId == -1) {
+            return;
+        }
+        AnimationHandlers.playAnimation(entityType, entityId, animation, viewers);
     }
 
     @Override
-    public void playAnimation(@NotNull Viewer viewer, @NotNull Animation animation) {
+    public void playAnimation(@NotNull Viewer viewer, @NotNull NPCAnimation animation) {
+        if (entityId == -1) {
+            return;
+        }
+        AnimationHandlers.playAnimation(entityType, entityId, animation, java.util.List.of(viewer));
+    }
+
+    @Override
+    public void playStatus(@NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, viewers);
+    }
+
+    @Override
+    public void playStatus(@NotNull Viewer viewer, @NotNull EntityStatus status) {
+        if (entityId == -1) {
+            return;
+        }
+        StatusHandlers.playStatus(entityType, entityId, status, java.util.List.of(viewer));
     }
 
     @Override
@@ -259,5 +289,15 @@ public class EntityLibArmorStandNPC extends AbstractNPC<ArmorStandAppearance> {
 
     public WrapperLivingEntity getWrapperEntity() {
         return wrapperEntity;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
+    @Override
+    public String getName() {
+        return "";
     }
 }

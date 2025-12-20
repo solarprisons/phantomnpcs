@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static prisons.solar.npclib.api.interaction.InteractionHandler.ClickType.*;
+
 /**
  * Listens for entity interaction packets to detect NPC clicks.
  */
@@ -74,7 +76,7 @@ public class InteractionListener extends PacketListenerAbstract {
 
         // Check if this is one of our NPCs
         registry.byEntityId(entityId).ifPresent(npc -> {
-            Player player = (Player) event.getPlayer();
+            Player player = event.getPlayer();
             UUID playerId = player.getUniqueId();
 
             // Apply cooldown
@@ -97,14 +99,7 @@ public class InteractionListener extends PacketListenerAbstract {
 
             // Determine click type
             WrapperPlayClientInteractEntity.InteractAction action = packet.getAction();
-            InteractionHandler.ClickType clickType = switch (action) {
-                case INTERACT -> InteractionHandler.ClickType.RIGHT_CLICK;
-                case ATTACK -> InteractionHandler.ClickType.LEFT_CLICK;
-                case INTERACT_AT -> {
-                    // INTERACT_AT is right-click at specific position
-                    yield InteractionHandler.ClickType.RIGHT_CLICK;
-                }
-            };
+            InteractionHandler.ClickType clickType = getClickType(player, action);
 
             // Determine hand
             InteractionHandler.Hand hand = InteractionHandler.Hand.MAIN_HAND;
@@ -151,6 +146,14 @@ public class InteractionListener extends PacketListenerAbstract {
                 }
             });
         });
+    }
+
+    private static @NotNull InteractionHandler.ClickType getClickType(Player player, WrapperPlayClientInteractEntity.InteractAction action) {
+        boolean isSneaking = player.isSneaking();
+        return switch (action) {
+            case ATTACK -> isSneaking ? SHIFT_LEFT_CLICK : LEFT_CLICK;
+            case INTERACT, INTERACT_AT -> isSneaking ? SHIFT_RIGHT_CLICK : RIGHT_CLICK;
+        };
     }
 
     /**
