@@ -17,7 +17,7 @@ import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.*;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation.EntityAnimationType;
+import com.github.retrooper.packetevents.wrapper.play.server.Wrapper.EntityAnimationType;
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.viewer.Viewer;
@@ -110,7 +110,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
         return switch (type) {
             case SPAWN_PLAYER, SPAWN_ENTITY, ENTITY_DESTROY, PLAYER_INFO_ADD, PLAYER_INFO_REMOVE,
                  ENTITY_TELEPORT, ENTITY_HEAD_ROTATION, ENTITY_METADATA, ENTITY_EQUIPMENT,
-                 ENTITY_ANIMATION, ENTITY_LOOK -> true;
+                 ENTITY_ANIMATION, ENTITY_STATUS, ENTITY_LOOK -> true;
             default -> false;
         };
     }
@@ -136,6 +136,7 @@ public class PacketEventsAdapter implements ProtocolAdapter {
             case EntityMetadataPacket p -> translateMetadata(p);
             case EntityEquipmentPacket p -> translateEquipment(p);
             case EntityAnimationPacket p -> translateAnimation(p);
+            case EntityStatusPacket p -> translateEntityStatus(p);
             case EntityRotationPacket p -> translateRotation(p);
             default -> null;
         };
@@ -264,9 +265,13 @@ public class PacketEventsAdapter implements ProtocolAdapter {
         return new WrapperPlayServerEntityEquipment(packet.entityId(), equipment);
     }
 
-    private WrapperPlayServerEntityAnimation translateAnimation(EntityAnimationPacket packet) {
+    private Wrapper translateAnimation(EntityAnimationPacket packet) {
         var type = EntityAnimationType.values()[packet.animation()];
-        return new WrapperPlayServerEntityAnimation(packet.entityId(), type);
+        return new Wrapper(packet.entityId(), type);
+    }
+
+    private WrapperPlayServerEntityStatus translateEntityStatus(EntityStatusPacket packet) {
+        return new WrapperPlayServerEntityStatus(packet.entityId(), packet.status());
     }
 
     private WrapperPlayServerEntityRotation translateRotation(EntityRotationPacket packet) {
