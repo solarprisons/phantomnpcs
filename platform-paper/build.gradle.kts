@@ -8,10 +8,10 @@ dependencies {
     api(project(":core"))
 
     // Paper API
-    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
 
     // PacketEvents - required for EntityLib
-    compileOnly("com.github.retrooper:packetevents-spigot:2.7.0")
+    compileOnly("com.github.retrooper:packetevents-spigot:2.11.0")
 
     // EntityLib for packet-based entities
     implementation("io.github.tofaa2:spigot:3.0.3-SNAPSHOT")
