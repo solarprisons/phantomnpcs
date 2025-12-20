@@ -41,12 +41,30 @@ public interface InteractionHandler {
         }
 
         /**
+         * Returns whether the interaction was a left click AND player was crouching simultaneously.
+         *
+         * @return true if shift left click
+         */
+        public boolean isShiftLeftClick() {
+            return clickType == ClickType.SHIFT_LEFT_CLICK;
+        }
+
+        /**
          * Returns whether the interaction was a right click (interact).
          *
          * @return true if right click
          */
         public boolean isRightClick() {
             return clickType == ClickType.RIGHT_CLICK;
+        }
+
+        /**
+         * Returns whether the interaction was a right click AND player was crouching simultaneously.
+         *
+         * @return true if shift right click
+         */
+        public boolean isShiftRightClick() {
+            return clickType == ClickType.SHIFT_RIGHT_CLICK;
         }
     }
 
