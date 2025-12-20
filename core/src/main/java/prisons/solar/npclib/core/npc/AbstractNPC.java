@@ -1,6 +1,8 @@
 package prisons.solar.npclib.core.npc;
 
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.animation.AnimationSupport;
+import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.appearance.NPCAppearance;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.interaction.InteractionHandler;
@@ -8,6 +10,8 @@ import prisons.solar.npclib.api.metadata.NPCMetadata;
 import prisons.solar.npclib.api.npc.NPC;
 import prisons.solar.npclib.api.npc.NPCState;
 import prisons.solar.npclib.api.npc.Position;
+import prisons.solar.npclib.api.status.EntityStatus;
+import prisons.solar.npclib.api.status.EntityStatusSupport;
 import prisons.solar.npclib.api.viewer.Viewer;
 
 import java.util.Collection;
@@ -20,7 +24,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  *
  * @param <A> the appearance type
  */
-public abstract class AbstractNPC<A extends NPCAppearance> implements NPC<A> {
+public abstract class AbstractNPC<A extends NPCAppearance> implements NPC<A>  {
 
     protected final UUID id;
     protected final EntityType entityType;
@@ -107,6 +111,26 @@ public abstract class AbstractNPC<A extends NPCAppearance> implements NPC<A> {
     @Override
     public void onClick(@NotNull InteractionHandler handler) {
         this.interactionHandler = handler;
+    }
+
+    @Override
+    public boolean supportsAnimation(@NotNull NPCAnimation animation) {
+        return AnimationSupport.supportsAnimation(entityType, animation);
+    }
+
+    @Override
+    public @NotNull Collection<NPCAnimation> supportedAnimations() {
+        return AnimationSupport.getSupportedAnimations(entityType);
+    }
+
+    @Override
+    public boolean supportsStatus(@NotNull EntityStatus status) {
+        return EntityStatusSupport.supportsStatus(entityType, status);
+    }
+
+    @Override
+    public @NotNull Collection<EntityStatus> supportedStatuses() {
+        return EntityStatusSupport.getSupportedStatuses(entityType);
     }
 
     /**
