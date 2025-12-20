@@ -2,6 +2,7 @@ package prisons.solar.npclib.core.ai.goals;
 
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.ai.Goal;
+import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.npc.NPC;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -11,7 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class PlayAnimationGoal implements Goal {
 
-    private final NPC.Animation animation;
+    private final NPCAnimation animation;
     private final int priority;
     private final float chance;
     private final int cooldownTicks;
@@ -23,7 +24,7 @@ public class PlayAnimationGoal implements Goal {
      *
      * @param animation the animation to play
      */
-    public PlayAnimationGoal(@NotNull NPC.Animation animation) {
+    public PlayAnimationGoal(@NotNull NPCAnimation animation) {
         this(animation, 90, 0.01f, 100);
     }
 
@@ -35,7 +36,7 @@ public class PlayAnimationGoal implements Goal {
      * @param chance        chance per tick to play (0.0-1.0)
      * @param cooldownTicks minimum ticks between animations
      */
-    public PlayAnimationGoal(@NotNull NPC.Animation animation, int priority, float chance, int cooldownTicks) {
+    public PlayAnimationGoal(@NotNull NPCAnimation animation, int priority, float chance, int cooldownTicks) {
         this.animation = animation;
         this.priority = priority;
         this.chance = chance;
