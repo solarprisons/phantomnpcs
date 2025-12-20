@@ -9,10 +9,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.Phantom;
+import prisons.solar.npclib.api.animation.EntityAnimation;
+import prisons.solar.npclib.api.animation.MobAnimation;
+import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.entity.EntityCategory;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.npc.NPC;
 import prisons.solar.npclib.api.npc.Position;
+import prisons.solar.npclib.api.status.CommonStatus;
 import prisons.solar.npclib.paper.PaperPhantom;
 
 import java.nio.file.Path;
@@ -145,16 +149,44 @@ public class PhantomTestPlugin extends JavaPlugin implements TabCompleter {
                     NPC<?> npc = getNpc(p);
                     if (npc == null) return;
                     if (args.length == 0) {
-                        send(p, PREFIX + "Animations: " + String.join(", ",
-                                Arrays.stream(NPC.Animation.values()).map(Enum::name).toArray(String[]::new)));
+                        var supported = npc.supportedAnimations();
+                        send(p, PREFIX + "Available animations for §f" + npc.entityType() + " §7(§f" + supported.size() + "§7):");
+                        supported.forEach(anim ->
+                                send(p, "  §8- §f" + anim.name().toLowerCase())
+                        );
                         return;
                     }
                     try {
-                        NPC.Animation anim = NPC.Animation.valueOf(args[0].toUpperCase());
-                        npc.playAnimation(anim);
-                        send(p, SUCCESS_PREFIX + "Played animation: " + anim);
+                        var animation = parseAnimation(args[0].toUpperCase(), npc);
+                        npc.playAnimation(animation);
+                        send(p, SUCCESS_PREFIX + "Played animation: §f" + animation.name().toLowerCase());
                     } catch (IllegalArgumentException e) {
-                        send(p, ERROR_PREFIX + "Unknown animation: " + args[0]);
+                        send(p, ERROR_PREFIX + "Invalid animation: §f" + args[0]);
+                        send(p, PREFIX + "Use §f/npctest anim §7to see available animations");
+                    }
+                }
+        ));
+
+        commands.put("status", new SubCommand(
+                "status <status>", "Play an entity status",
+                (p, args) -> {
+                    NPC<?> npc = getNpc(p);
+                    if (npc == null) return;
+                    if (args.length == 0) {
+                        var supported = npc.supportedStatuses();
+                        send(p, PREFIX + "Available statuses for §f" + npc.entityType() + " §7(§f" + supported.size() + "§7):");
+                        supported.forEach(status ->
+                                send(p, "  §8- §f" + status.name().toLowerCase())
+                        );
+                        return;
+                    }
+                    try {
+                        var status = parseStatus(args[0].toUpperCase(), npc);
+                        npc.playStatus(status);
+                        send(p, SUCCESS_PREFIX + "Played status: §f" + status.name().toLowerCase());
+                    } catch (IllegalArgumentException e) {
+                        send(p, ERROR_PREFIX + "Invalid status: §f" + args[0]);
+                        send(p, PREFIX + "Use §f/npctest status §7to see available statuses");
                     }
                 }
         ));
@@ -212,7 +244,30 @@ public class PhantomTestPlugin extends JavaPlugin implements TabCompleter {
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "mob" -> filter(getMobTypes(), args[1]);
-                case "anim" -> filter(Arrays.stream(NPC.Animation.values()).map(Enum::name).toList(), args[1]);
+                case "anim" -> {
+                    if (!(sender instanceof Player player)) yield List.of();
+                    NPC<?> npc = playerNpcs.get(player.getUniqueId());
+                    if (npc == null) yield List.of();
+                    yield filter(
+                            npc.supportedAnimations().stream()
+                                    .map(prisons.solar.npclib.api.animation.NPCAnimation::name)
+                                    .map(String::toLowerCase)
+                                    .toList(),
+                            args[1]
+                    );
+                }
+                case "status" -> {
+                    if (!(sender instanceof Player player)) yield List.of();
+                    NPC<?> npc = playerNpcs.get(player.getUniqueId());
+                    if (npc == null) yield List.of();
+                    yield filter(
+                            npc.supportedStatuses().stream()
+                                    .map(prisons.solar.npclib.api.status.EntityStatus::name)
+                                    .map(String::toLowerCase)
+                                    .toList(),
+                            args[1]
+                    );
+                }
                 default -> List.of();
             };
         }
@@ -293,6 +348,28 @@ public class PhantomTestPlugin extends JavaPlugin implements TabCompleter {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    private static prisons.solar.npclib.api.animation.NPCAnimation parseAnimation(String name, NPC<?> npc) {
+        return npc.supportedAnimations().stream()
+                .filter(anim -> anim.name().equalsIgnoreCase(name))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown animation: " + name));
+    }
+
+    private static prisons.solar.npclib.api.status.EntityStatus parseStatus(String name, NPC<?> npc) {
+        // Try CommonStatus first (universal statuses)
+        try {
+            return CommonStatus.valueOf(name);
+        } catch (IllegalArgumentException ignored) {
+            // Not a common status, try entity-specific statuses
+        }
+
+        // Search through all supported statuses for entity-specific ones
+        return npc.supportedStatuses().stream()
+                .filter(status -> status.name().equalsIgnoreCase(name))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown status: " + name));
     }
 
     private record SubCommand(String usage, String description, BiConsumer<Player, String[]> handler) {
