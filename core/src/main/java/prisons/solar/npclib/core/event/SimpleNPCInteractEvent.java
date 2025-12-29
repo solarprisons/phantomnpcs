@@ -1,10 +1,12 @@
 package prisons.solar.npclib.core.event;
 
 import org.jetbrains.annotations.NotNull;
-import prisons.solar.npclib.api.event.NPCInteractEvent;
+import prisons.solar.npclib.api.event.npc.NPCInteractEvent;
 import prisons.solar.npclib.api.interaction.InteractionHandler;
 import prisons.solar.npclib.api.npc.NPC;
 import prisons.solar.npclib.api.viewer.Viewer;
+
+import java.time.Instant;
 
 /**
  * Simple implementation of {@link NPCInteractEvent}.
@@ -16,6 +18,7 @@ public class SimpleNPCInteractEvent implements NPCInteractEvent {
     private final InteractionHandler.ClickType clickType;
     private final InteractionHandler.Hand hand;
     private boolean cancelled;
+    private final Instant timestamp;
 
     public SimpleNPCInteractEvent(@NotNull NPC<?> npc,
                                    @NotNull Viewer viewer,
@@ -25,6 +28,7 @@ public class SimpleNPCInteractEvent implements NPCInteractEvent {
         this.viewer = viewer;
         this.clickType = clickType;
         this.hand = hand;
+        this.timestamp = Instant.now();
     }
 
     @Override
@@ -55,5 +59,10 @@ public class SimpleNPCInteractEvent implements NPCInteractEvent {
     @Override
     public void setCancelled(boolean cancelled) {
         this.cancelled = cancelled;
+    }
+
+    @Override
+    public @NotNull Instant timestamp() {
+        return timestamp;
     }
 }

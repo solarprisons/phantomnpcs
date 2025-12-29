@@ -29,7 +29,7 @@ public class AsyncVisibilityCalculator {
     private final BiPredicate<NPC<?>, Viewer> visibilityCheck;
     private final BiConsumer<NPC<?>, Viewer> spawnCallback;
     private final BiConsumer<NPC<?>, Viewer> despawnCallback;
-    private final double viewDistanceSquared;
+    private volatile double viewDistanceSquared;
 
     private final ExecutorService executor;
     private final Queue<VisibilityResult> resultQueue = new ConcurrentLinkedQueue<>();
@@ -123,7 +123,13 @@ public class AsyncVisibilityCalculator {
             return;
         }
 
-        executor.submit(() -> calculateVisibility(viewer));
+        executor.submit(() -> {
+            try {
+                calculateVisibility(viewer);
+            } catch (Exception e) {
+                // Swallow - don't let single viewer crash visibility thread
+            }
+        });
     }
 
     /**
@@ -189,11 +195,11 @@ public class AsyncVisibilityCalculator {
             boolean shouldBeVisible = shouldBeVisible(npc, viewer);
 
             if (shouldBeVisible) {
-                nowVisible.add(npc.id());
-                if (!currentlyVisible.contains(npc.id())) {
+                nowVisible.add(npc.getId());
+                if (!currentlyVisible.contains(npc.getId())) {
                     toSpawn.add(npc);
                 }
-            } else if (currentlyVisible.contains(npc.id())) {
+            } else if (currentlyVisible.contains(npc.getId())) {
                 toDespawn.add(npc);
             }
         }
@@ -214,12 +220,12 @@ public class AsyncVisibilityCalculator {
 
     private boolean shouldBeVisible(@NotNull NPC<?> npc, @NotNull Viewer viewer) {
         // Check same world
-        if (!npc.position().worldId().equals(viewer.position().worldId())) {
+        if (!npc.getPosition().worldId().equals(viewer.position().worldId())) {
             return false;
         }
 
         // Check distance
-        double distanceSq = npc.position().distanceSquared(viewer.position());
+        double distanceSq = npc.getPosition().distanceSquared(viewer.position());
         if (distanceSq > viewDistanceSquared) {
             return false;
         }
@@ -239,7 +245,7 @@ public class AsyncVisibilityCalculator {
                 spawnCallback.accept(npc, result.viewer());
                 spawnsTriggered++;
             } catch (Exception e) {
-                System.err.println("[Phantom] Error spawning NPC: " + e.getMessage());
+                // Swallow callback errors to continue processing
             }
         }
 
@@ -249,7 +255,7 @@ public class AsyncVisibilityCalculator {
                 despawnCallback.accept(npc, result.viewer());
                 despawnsTriggered++;
             } catch (Exception e) {
-                System.err.println("[Phantom] Error despawning NPC: " + e.getMessage());
+                // Swallow callback errors to continue processing
             }
         }
     }
@@ -271,7 +277,7 @@ public class AsyncVisibilityCalculator {
     public void onNPCRemoved(@NotNull NPC<?> npc) {
         // Remove from all viewer visible sets
         for (Set<UUID> visibleSet : viewerVisibleNPCs.values()) {
-            visibleSet.remove(npc.id());
+            visibleSet.remove(npc.getId());
         }
     }
 
@@ -283,7 +289,7 @@ public class AsyncVisibilityCalculator {
      */
     public void forceVisible(@NotNull NPC<?> npc, @NotNull Viewer viewer) {
         viewerVisibleNPCs.computeIfAbsent(viewer.id(), k -> ConcurrentHashMap.newKeySet())
-                .add(npc.id());
+                .add(npc.getId());
     }
 
     /**
@@ -295,7 +301,7 @@ public class AsyncVisibilityCalculator {
     public void forceHidden(@NotNull NPC<?> npc, @NotNull Viewer viewer) {
         Set<UUID> visible = viewerVisibleNPCs.get(viewer.id());
         if (visible != null) {
-            visible.remove(npc.id());
+            visible.remove(npc.getId());
         }
     }
 
@@ -308,7 +314,28 @@ public class AsyncVisibilityCalculator {
      */
     public boolean isVisible(@NotNull NPC<?> npc, @NotNull Viewer viewer) {
         Set<UUID> visible = viewerVisibleNPCs.get(viewer.id());
-        return visible != null && visible.contains(npc.id());
+        return visible != null && visible.contains(npc.getId());
+    }
+
+    /**
+     * Updates the view distance and recalculates all visibility.
+     * This triggers an immediate visibility recalculation for all NPCs and viewers.
+     *
+     * @param viewDistance the new view distance in blocks
+     */
+    public void setViewDistance(double viewDistance) {
+        this.viewDistanceSquared = viewDistance * viewDistance;
+        // Clear all visibility data to force recalculation
+        viewerVisibleNPCs.clear();
+    }
+
+    /**
+     * Gets the current view distance.
+     *
+     * @return view distance in blocks
+     */
+    public double getViewDistance() {
+        return Math.sqrt(viewDistanceSquared);
     }
 
     /**

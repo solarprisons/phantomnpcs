@@ -67,7 +67,11 @@ public class SimpleNPCMetadata implements NPCMetadata {
 
     private void notifyDirty() {
         if (dirtyCallback != null) {
-            dirtyCallback.run();
+            try {
+                dirtyCallback.run();
+            } catch (Exception e) {
+                // Swallow - metadata operations should not fail due to callback errors
+            }
         }
     }
 }

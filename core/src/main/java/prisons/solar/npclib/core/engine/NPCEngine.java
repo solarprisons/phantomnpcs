@@ -35,7 +35,7 @@ public class NPCEngine {
      * @param selector the goal selector
      */
     public void registerGoalSelector(@NotNull NPC<?> npc, @NotNull GoalSelector selector) {
-        goalSelectors.put(npc.id(), selector);
+        goalSelectors.put(npc.getId(), selector);
     }
 
     /**
@@ -44,7 +44,7 @@ public class NPCEngine {
      * @param npc the NPC
      */
     public void unregisterGoalSelector(@NotNull NPC<?> npc) {
-        goalSelectors.remove(npc.id());
+        goalSelectors.remove(npc.getId());
     }
 
     /**
@@ -54,7 +54,7 @@ public class NPCEngine {
      * @return the goal selector, or null
      */
     public GoalSelector getGoalSelector(@NotNull NPC<?> npc) {
-        return goalSelectors.get(npc.id());
+        return goalSelectors.get(npc.getId());
     }
 
     /**
@@ -64,7 +64,7 @@ public class NPCEngine {
      * @param callback the tick callback
      */
     public void registerTickCallback(@NotNull NPC<?> npc, @NotNull Consumer<NPC<?>> callback) {
-        tickCallbacks.put(npc.id(), callback);
+        tickCallbacks.put(npc.getId(), callback);
     }
 
     /**
@@ -73,7 +73,7 @@ public class NPCEngine {
      * @param npc the NPC
      */
     public void unregisterTickCallback(@NotNull NPC<?> npc) {
-        tickCallbacks.remove(npc.id());
+        tickCallbacks.remove(npc.getId());
     }
 
     /**
@@ -128,19 +128,22 @@ public class NPCEngine {
      */
     private void tickNPC(@NotNull NPC<?> npc) {
         // Tick goal selector
-        GoalSelector selector = goalSelectors.get(npc.id());
+        GoalSelector selector = goalSelectors.get(npc.getId());
         if (selector != null) {
-            selector.tick();
+            try {
+                selector.tick();
+            } catch (Exception e) {
+                // Swallow to prevent single NPC from crashing the engine
+            }
         }
 
         // Run custom tick callback
-        Consumer<NPC<?>> callback = tickCallbacks.get(npc.id());
+        Consumer<NPC<?>> callback = tickCallbacks.get(npc.getId());
         if (callback != null) {
             try {
                 callback.accept(npc);
             } catch (Exception e) {
-                // Log but don't crash
-                System.err.println("[Phantom] Error in tick callback for NPC " + npc.id() + ": " + e.getMessage());
+                // Swallow to prevent single NPC from crashing the engine
             }
         }
     }
@@ -179,7 +182,7 @@ public class NPCEngine {
      * @param npc the NPC
      */
     public void cleanup(@NotNull NPC<?> npc) {
-        goalSelectors.remove(npc.id());
-        tickCallbacks.remove(npc.id());
+        goalSelectors.remove(npc.getId());
+        tickCallbacks.remove(npc.getId());
     }
 }

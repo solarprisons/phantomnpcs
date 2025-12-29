@@ -52,7 +52,7 @@ public class LookAtViewerGoal implements Goal {
             return false;
         }
 
-        Position npcPos = npc.position();
+        Position npcPos = npc.getPosition();
         Position viewerPos = target.position();
 
         // Check same world and distance
@@ -89,7 +89,7 @@ public class LookAtViewerGoal implements Goal {
     }
 
     private Viewer findNearestViewer(NPC<?> npc) {
-        Position npcPos = npc.position();
+        Position npcPos = npc.getPosition();
         double maxDistSq = maxDistance * maxDistance;
 
         Viewer nearest = null;

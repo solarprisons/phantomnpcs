@@ -60,7 +60,7 @@ public class LookRandomlyGoal implements Goal {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         lookTimer = minLookTime + random.nextInt(maxLookTime - minLookTime);
 
-        Position pos = npc.position();
+        Position pos = npc.getPosition();
         targetYaw = pos.yaw() + (random.nextFloat() - 0.5f) * 90f;
         targetPitch = (random.nextFloat() - 0.5f) * 40f;
     }
@@ -69,7 +69,7 @@ public class LookRandomlyGoal implements Goal {
     public void tick(@NotNull NPC<?> npc) {
         lookTimer--;
 
-        Position pos = npc.position();
+        Position pos = npc.getPosition();
         float currentYaw = pos.yaw();
         float currentPitch = pos.pitch();
 

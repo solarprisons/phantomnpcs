@@ -23,8 +23,8 @@ public class ProximityTracker {
      * @param trigger the trigger
      */
     public void register(@NotNull ProximityTrigger trigger) {
-        triggers.put(trigger.npc().id(), trigger);
-        viewersInRange.putIfAbsent(trigger.npc().id(), ConcurrentHashMap.newKeySet());
+        triggers.put(trigger.npc().getId(), trigger);
+        viewersInRange.putIfAbsent(trigger.npc().getId(), ConcurrentHashMap.newKeySet());
     }
 
     /**
@@ -44,8 +44,8 @@ public class ProximityTracker {
      * @param npc the NPC
      */
     public void unregister(@NotNull NPC<?> npc) {
-        triggers.remove(npc.id());
-        viewersInRange.remove(npc.id());
+        triggers.remove(npc.getId());
+        viewersInRange.remove(npc.getId());
     }
 
     /**
@@ -55,7 +55,7 @@ public class ProximityTracker {
      * @return the trigger, or null
      */
     public ProximityTrigger getTrigger(@NotNull NPC<?> npc) {
-        return triggers.get(npc.id());
+        return triggers.get(npc.getId());
     }
 
     /**
@@ -65,7 +65,7 @@ public class ProximityTracker {
      * @return true if has trigger
      */
     public boolean hasTrigger(@NotNull NPC<?> npc) {
-        return triggers.containsKey(npc.id());
+        return triggers.containsKey(npc.getId());
     }
 
     /**
@@ -93,25 +93,25 @@ public class ProximityTracker {
 
     private void tickTrigger(@NotNull ProximityTrigger trigger, @NotNull Viewer viewer) {
         NPC<?> npc = trigger.npc();
-        Set<UUID> inRange = viewersInRange.get(npc.id());
+        Set<UUID> inRange = viewersInRange.get(npc.getId());
         if (inRange == null) {
             return;
         }
 
         // Check same world
-        if (!viewer.position().worldId().equals(npc.position().worldId())) {
+        if (!viewer.position().worldId().equals(npc.getPosition().worldId())) {
             // Different world - treat as exit if was in range
             if (inRange.remove(viewer.id())) {
                 try {
                     trigger.handler().onExit(npc, viewer);
                 } catch (Exception e) {
-                    System.err.println("[Phantom] Error in proximity exit handler: " + e.getMessage());
+                    // Swallow handler errors to prevent propagation
                 }
             }
             return;
         }
 
-        double distanceSq = viewer.position().distanceSquared(npc.position());
+        double distanceSq = viewer.position().distanceSquared(npc.getPosition());
         double radiusSq = trigger.radius() * trigger.radius();
         boolean wasInRange = inRange.contains(viewer.id());
         boolean nowInRange = distanceSq <= radiusSq;
@@ -122,7 +122,7 @@ public class ProximityTracker {
             try {
                 trigger.handler().onEnter(npc, viewer);
             } catch (Exception e) {
-                System.err.println("[Phantom] Error in proximity enter handler: " + e.getMessage());
+                // Swallow handler errors to prevent propagation
             }
         } else if (!nowInRange && wasInRange) {
             // Exited range
@@ -130,14 +130,14 @@ public class ProximityTracker {
             try {
                 trigger.handler().onExit(npc, viewer);
             } catch (Exception e) {
-                System.err.println("[Phantom] Error in proximity exit handler: " + e.getMessage());
+                // Swallow handler errors to prevent propagation
             }
         } else if (nowInRange) {
             // Staying in range
             try {
                 trigger.handler().onStay(npc, viewer);
             } catch (Exception e) {
-                System.err.println("[Phantom] Error in proximity stay handler: " + e.getMessage());
+                // Swallow handler errors to prevent propagation
             }
         }
     }
@@ -171,7 +171,7 @@ public class ProximityTracker {
      */
     @NotNull
     public Set<UUID> viewersInRange(@NotNull NPC<?> npc) {
-        Set<UUID> inRange = viewersInRange.get(npc.id());
+        Set<UUID> inRange = viewersInRange.get(npc.getId());
         return inRange != null ? Collections.unmodifiableSet(inRange) : Collections.emptySet();
     }
 

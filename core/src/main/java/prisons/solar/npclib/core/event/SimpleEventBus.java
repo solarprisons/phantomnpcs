@@ -2,7 +2,7 @@ package prisons.solar.npclib.core.event;
 
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.event.EventBus;
-import prisons.solar.npclib.api.event.NPCEvent;
+import prisons.solar.npclib.api.event.npc.NPCEvent;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -32,9 +32,18 @@ public class SimpleEventBus implements EventBus {
             @NotNull Priority priority
     ) {
         HandlerEntry<T> entry = new HandlerEntry<>(handler, priority);
-        handlers.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(entry);
-        // Sort by priority
-        handlers.get(eventType).sort(Comparator.comparingInt(e -> e.priority.ordinal()));
+        List<HandlerEntry<?>> list = handlers.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+
+        // Use insertion sort for O(n) complexity instead of full re-sort O(n log n)
+        int insertIndex = 0;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).priority.ordinal() <= priority.ordinal()) {
+                insertIndex = i + 1;
+            } else {
+                break;
+            }
+        }
+        list.add(insertIndex, entry);
 
         return new Subscription() {
             private boolean active = true;
@@ -63,7 +72,7 @@ public class SimpleEventBus implements EventBus {
                 try {
                     ((Consumer<T>) entry.handler).accept(event);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    // Swallow handler exceptions to prevent event propagation failures
                 }
             }
         }
