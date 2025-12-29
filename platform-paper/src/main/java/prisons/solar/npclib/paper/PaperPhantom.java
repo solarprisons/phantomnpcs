@@ -5,6 +5,7 @@ import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import me.tofaa.entitylib.APIConfig;
 import me.tofaa.entitylib.EntityLib;
 import me.tofaa.entitylib.spigot.SpigotEntityLibPlatform;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +29,7 @@ import prisons.solar.npclib.core.event.SimpleEventBus;
 import prisons.solar.npclib.core.hologram.SimpleHologramRegistry;
 import prisons.solar.npclib.core.npc.SimpleNPCRegistry;
 import prisons.solar.npclib.core.service.SimpleServiceRegistry;
-import prisons.solar.npclib.core.spatial.SpatialIndex;
+import prisons.solar.npclib.core.spatial.SpatialGrid;
 import prisons.solar.npclib.paper.listener.InteractionListener;
 import prisons.solar.npclib.paper.npc.EntityLibArmorStandNPC;
 import prisons.solar.npclib.paper.npc.EntityLibBlockDisplayNPC;
@@ -37,10 +38,18 @@ import prisons.solar.npclib.paper.npc.EntityLibLivingNPC;
 import prisons.solar.npclib.paper.npc.EntityLibPlayerNPC;
 import prisons.solar.npclib.paper.npc.EntityLibTextDisplayNPC;
 import prisons.solar.npclib.paper.skin.SkinManager;
+import prisons.solar.npclib.api.world.WorldProvider;
+import prisons.solar.npclib.paper.world.PaperWorldProvider;
+import prisons.solar.npclib.core.physics.PhysicsEngine;
+import prisons.solar.npclib.core.physics.CollisionManager;
+import prisons.solar.npclib.core.ai.pathfinding.PathfindingService;
+import prisons.solar.npclib.api.ai.pathfinding.PathfindingComponent;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -59,8 +68,13 @@ public class PaperPhantom implements Phantom {
     private final InteractionListener interactionListener;
     private final NPCEngine npcEngine;
     private final ProximityTracker proximityTracker;
-    private final SpatialIndex spatialIndex;
+    private final SpatialGrid spatialGrid;
     private final SimpleHologramRegistry hologramRegistry;
+    private final PaperWorldProvider worldProvider;
+    private final CollisionManager collisionManager;
+    private final PhysicsEngine physicsEngine;
+    private final ScheduledExecutorService physicsScheduler;
+    private final PathfindingService pathfindingService;
 
     private final PhantomConfig config;
     private PacketBatcher<Object, Viewer> packetBatcher;
@@ -82,22 +96,39 @@ public class PaperPhantom implements Phantom {
         this.interactionListener = new InteractionListener(plugin, npcRegistry, platform, eventBus);
         this.npcEngine = new NPCEngine(npcRegistry);
         this.proximityTracker = new ProximityTracker();
-        this.spatialIndex = new SpatialIndex(config.viewDistance());
+        this.spatialGrid = new SpatialGrid(config.viewDistance());
         this.hologramRegistry = new SimpleHologramRegistry();
+
+        // Initialize physics components
+        this.worldProvider = new PaperWorldProvider();
+        this.collisionManager = new CollisionManager(worldProvider);
+        this.physicsScheduler = Executors.newScheduledThreadPool(1,
+                r -> new Thread(r, "phantom-physics"));
+        this.physicsEngine = new PhysicsEngine(collisionManager, physicsScheduler);
+
+        // Initialize pathfinding service (HPA* with chunk-level abstraction)
+        this.pathfindingService = new PathfindingService(
+            worldProvider,
+            4 // 4 pathfinding threads
+        );
 
         // Register services
         services.register(SkinManager.class, skinManager);
         services.register(NPCEngine.class, npcEngine);
         services.register(ProximityTracker.class, proximityTracker);
-        services.register(SpatialIndex.class, spatialIndex);
+        services.register(SpatialGrid.class, spatialGrid);
         services.register(SimpleHologramRegistry.class, hologramRegistry);
         services.register(PhantomConfig.class, config);
+        services.register(CollisionManager.class, collisionManager);
+        services.register(PhysicsEngine.class, physicsEngine);
+        services.register(PathfindingComponent.class, pathfindingService.getPathfinder());
+        services.register(WorldProvider.class, worldProvider);
     }
 
     private NPC<?> createNPC(EntityType type, Position position) {
         return switch (type) {
             case PLAYER -> {
-                EntityLibPlayerNPC npc = new EntityLibPlayerNPC(position);
+                EntityLibPlayerNPC npc = new EntityLibPlayerNPC(position, services);
                 npc.setSkinManager(skinManager);
                 npc.setEventBus(eventBus);
                 yield npc;
@@ -109,27 +140,27 @@ public class PaperPhantom implements Phantom {
                  COW, PIG, SHEEP, CHICKEN, WOLF, CAT, HORSE, DONKEY,
                  MULE, LLAMA, FOX, PANDA, BEE, FROG, AXOLOTL, GOAT,
                  CAMEL, SNIFFER, ARMADILLO -> {
-                EntityLibLivingNPC npc = new EntityLibLivingNPC(type, position);
+                EntityLibLivingNPC npc = new EntityLibLivingNPC(type, position, services);
                 npc.setEventBus(eventBus);
                 yield npc;
             }
             case ARMOR_STAND -> {
-                EntityLibArmorStandNPC npc = new EntityLibArmorStandNPC(position);
+                EntityLibArmorStandNPC npc = new EntityLibArmorStandNPC(position, services);
                 npc.setEventBus(eventBus);
                 yield npc;
             }
             case TEXT_DISPLAY -> {
-                EntityLibTextDisplayNPC npc = new EntityLibTextDisplayNPC(position);
+                EntityLibTextDisplayNPC npc = new EntityLibTextDisplayNPC(position, services);
                 npc.setEventBus(eventBus);
                 yield npc;
             }
             case BLOCK_DISPLAY -> {
-                EntityLibBlockDisplayNPC npc = new EntityLibBlockDisplayNPC(position);
+                EntityLibBlockDisplayNPC npc = new EntityLibBlockDisplayNPC(position, services);
                 npc.setEventBus(eventBus);
                 yield npc;
             }
             case ITEM_DISPLAY -> {
-                EntityLibItemDisplayNPC npc = new EntityLibItemDisplayNPC(position);
+                EntityLibItemDisplayNPC npc = new EntityLibItemDisplayNPC(position, services);
                 npc.setEventBus(eventBus);
                 yield npc;
             }
@@ -202,6 +233,18 @@ public class PaperPhantom implements Phantom {
         // Register interaction listener
         interactionListener.register();
 
+        // Register block change listener for cache invalidation
+        Bukkit.getPluginManager().registerEvents(
+                new prisons.solar.npclib.paper.listener.BlockChangeListener(collisionManager),
+                plugin
+        );
+
+        // Register world unload listener for cleanup
+        Bukkit.getPluginManager().registerEvents(
+                new prisons.solar.npclib.paper.listener.WorldUnloadListener(npcRegistry, collisionManager),
+                plugin
+        );
+
         // Register player listeners
         platform.onPlayerJoin(viewer -> {
             if (config.asyncVisibility() && asyncVisibilityCalculator != null) {
@@ -261,6 +304,14 @@ public class PaperPhantom implements Phantom {
                 () -> proximityTracker.tickAll(platform.onlineViewers()),
                 config.proximityTickRate() * 50L,
                 config.proximityTickRate() * 50L,
+                TimeUnit.MILLISECONDS
+        );
+
+        // Start pathfinding budget reset task
+        platform.scheduler().runSyncRepeating(
+                pathfindingService::onTick,
+                50L, // Every tick (50ms = 1 tick)
+                50L,
                 TimeUnit.MILLISECONDS
         );
 
@@ -324,7 +375,10 @@ public class PaperPhantom implements Phantom {
         hologramRegistry.clear();
 
         // Clear spatial index
-        spatialIndex.clear();
+        spatialGrid.clear();
+
+        // Shutdown pathfinding service
+        pathfindingService.shutdown();
 
         // Shutdown skin manager
         skinManager.shutdown();
@@ -337,6 +391,12 @@ public class PaperPhantom implements Phantom {
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    @Override
+    public void invalidatePathfindingCache(@NotNull String worldId, int x, int y, int z) {
+        Position position = new Position(worldId, x, y, z, 0, 0);
+        pathfindingService.invalidateRegion(position);
     }
 
     private void tickVisibility() {

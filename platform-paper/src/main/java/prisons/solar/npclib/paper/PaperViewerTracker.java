@@ -1,5 +1,6 @@
 package prisons.solar.npclib.paper;
 
+import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.npc.NPC;
 import prisons.solar.npclib.api.npc.NPCRegistry;
@@ -38,7 +39,7 @@ public class PaperViewerTracker implements ViewerTracker {
     }
 
     private boolean sameWorld(Viewer viewer, NPC<?> npc) {
-        return viewer.position().worldId().equals(npc.position().worldId());
+        return viewer.position().worldId().equals(npc.getPosition().worldId());
     }
 
     @Override
@@ -192,12 +193,12 @@ public class PaperViewerTracker implements ViewerTracker {
      * @param npc the NPC
      */
     public void clearManualOverrides(@NotNull NPC<?> npc) {
-        String suffix = ":" + npc.id().toString();
+        String suffix = ":" + npc.getId().toString();
         manuallyHidden.removeIf(key -> key.endsWith(suffix));
         manuallyShown.removeIf(key -> key.endsWith(suffix));
     }
 
     private String viewerNpcKey(Viewer viewer, NPC<?> npc) {
-        return viewer.id().toString() + ":" + npc.id().toString();
+        return viewer.id().toString() + ":" + npc.getId().toString();
     }
 }

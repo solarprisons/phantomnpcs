@@ -7,6 +7,7 @@ import me.tofaa.entitylib.meta.display.TextDisplayMeta;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.appearance.TextDisplayAppearance;
 import prisons.solar.npclib.api.npc.Position;
@@ -15,8 +16,8 @@ public class EntityLibTextDisplayNPC extends AbstractEntityLibDisplayNPC<TextDis
 
     private final EntityLibTextDisplayAppearance textDisplayAppearance;
 
-    public EntityLibTextDisplayNPC(@NotNull Position position) {
-        super(prisons.solar.npclib.api.entity.EntityType.TEXT_DISPLAY, position);
+    public EntityLibTextDisplayNPC(@NotNull Position position, @Nullable prisons.solar.npclib.api.service.ServiceRegistry services) {
+        super(prisons.solar.npclib.api.entity.EntityType.TEXT_DISPLAY, position, services);
         this.textDisplayAppearance = new EntityLibTextDisplayAppearance(this);
         this.appearance = textDisplayAppearance;
     }

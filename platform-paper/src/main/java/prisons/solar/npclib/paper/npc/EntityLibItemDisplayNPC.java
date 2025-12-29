@@ -7,6 +7,7 @@ import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.display.AbstractDisplayMeta;
 import me.tofaa.entitylib.meta.display.ItemDisplayMeta;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.appearance.ItemDisplayAppearance;
 import prisons.solar.npclib.api.npc.Position;
@@ -15,8 +16,8 @@ public class EntityLibItemDisplayNPC extends AbstractEntityLibDisplayNPC<ItemDis
 
     private final EntityLibItemDisplayAppearance itemDisplayAppearance;
 
-    public EntityLibItemDisplayNPC(@NotNull Position position) {
-        super(prisons.solar.npclib.api.entity.EntityType.ITEM_DISPLAY, position);
+    public EntityLibItemDisplayNPC(@NotNull Position position, @Nullable prisons.solar.npclib.api.service.ServiceRegistry services) {
+        super(prisons.solar.npclib.api.entity.EntityType.ITEM_DISPLAY, position, services);
         this.itemDisplayAppearance = new EntityLibItemDisplayAppearance(this);
         this.appearance = itemDisplayAppearance;
     }

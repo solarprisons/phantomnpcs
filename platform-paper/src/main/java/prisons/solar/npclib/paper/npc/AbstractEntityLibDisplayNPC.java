@@ -15,6 +15,8 @@ import prisons.solar.npclib.core.event.SimpleEventBus;
 import prisons.solar.npclib.core.event.SimpleNPCDespawnEvent;
 import prisons.solar.npclib.core.event.SimpleNPCSpawnEvent;
 import prisons.solar.npclib.core.npc.AbstractNPC;
+import prisons.solar.npclib.core.physics.CollisionManager;
+import prisons.solar.npclib.core.physics.PhysicsEngine;
 import prisons.solar.npclib.paper.PaperViewer;
 import prisons.solar.npclib.paper.status.StatusHandlers;
 
@@ -24,8 +26,9 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
     protected SimpleEventBus eventBus;
 
     public AbstractEntityLibDisplayNPC(@NotNull prisons.solar.npclib.api.entity.EntityType entityType,
-                                       @NotNull Position position) {
-        super(entityType, position);
+                                       @NotNull Position position,
+                                       @Nullable prisons.solar.npclib.api.service.ServiceRegistry services) {
+        super(entityType, position, services);
     }
 
     protected abstract EntityType getPacketEventsEntityType();
@@ -38,15 +41,23 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
 
     @Override
     public void spawn() {
-        if (state != NPCState.REGISTERED && state != NPCState.DESPAWNED) {
+        if (state.get() != NPCState.REGISTERED && state.get() != NPCState.DESPAWNED) {
             throw new IllegalStateException("NPC must be registered before spawning");
         }
-        state = NPCState.SPAWNED;
+        setState(NPCState.SPAWNED);
+
+        // Register physics if enabled
+        if (physicsEnabled && services != null) {
+            services.get(CollisionManager.class).ifPresent(cm ->
+                cm.registerEntity(this));
+            services.get(PhysicsEngine.class).ifPresent(pe ->
+                pe.registerEntity(this));
+        }
     }
 
     @Override
     public void spawn(@NotNull Viewer viewer) {
-        if (state == NPCState.UNREGISTERED || state == NPCState.DESTROYED) {
+        if (state.get() == NPCState.UNREGISTERED || state.get() == NPCState.DESTROYED) {
             return;
         }
 
@@ -66,9 +77,21 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
 
     @Override
     public void despawn() {
-        if (state == NPCState.DESTROYED) {
+        if (state.get() == NPCState.DESTROYED) {
             return;
         }
+
+        // Clean up goals BEFORE unregistering physics
+        cleanupGoals();
+
+        // Unregister physics if enabled
+        if (physicsEnabled && services != null) {
+            services.get(CollisionManager.class).ifPresent(cm ->
+                cm.unregisterEntity(getId()));
+            services.get(PhysicsEngine.class).ifPresent(pe ->
+                pe.unregisterEntity(this));
+        }
+
         for (Viewer viewer : viewers) {
             if (eventBus != null) {
                 eventBus.post(new SimpleNPCDespawnEvent(this, viewer));
@@ -76,7 +99,7 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
             sendDespawnPackets(viewer);
         }
         viewers.clear();
-        state = NPCState.DESPAWNED;
+        setState(NPCState.DESPAWNED);
     }
 
     @Override
@@ -91,8 +114,19 @@ public abstract class AbstractEntityLibDisplayNPC<A extends DisplayAppearance> e
 
     @Override
     public void destroy() {
+        // Clean up goals BEFORE anything else
+        cleanupGoals();
+
+        // Always unregister physics on destroy
+        if (services != null) {
+            services.get(CollisionManager.class).ifPresent(cm ->
+                cm.unregisterEntity(getId()));
+            services.get(PhysicsEngine.class).ifPresent(pe ->
+                pe.unregisterEntity(this));
+        }
+
         despawn();
-        state = NPCState.DESTROYED;
+        setState(NPCState.DESTROYED);
         if (wrapperEntity != null) {
             wrapperEntity.remove();
             wrapperEntity = null;

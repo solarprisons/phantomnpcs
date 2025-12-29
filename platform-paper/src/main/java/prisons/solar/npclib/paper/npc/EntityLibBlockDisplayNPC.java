@@ -8,6 +8,7 @@ import me.tofaa.entitylib.meta.display.AbstractDisplayMeta;
 import me.tofaa.entitylib.meta.display.BlockDisplayMeta;
 import org.bukkit.block.data.BlockData;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import prisons.solar.npclib.api.appearance.BlockDisplayAppearance;
 import prisons.solar.npclib.api.appearance.DisplayAppearance;
 import prisons.solar.npclib.api.npc.Position;
@@ -16,8 +17,8 @@ public class EntityLibBlockDisplayNPC extends AbstractEntityLibDisplayNPC<BlockD
 
     private final EntityLibBlockDisplayAppearance blockDisplayAppearance;
 
-    public EntityLibBlockDisplayNPC(@NotNull Position position) {
-        super(prisons.solar.npclib.api.entity.EntityType.BLOCK_DISPLAY, position);
+    public EntityLibBlockDisplayNPC(@NotNull Position position, @Nullable prisons.solar.npclib.api.service.ServiceRegistry services) {
+        super(prisons.solar.npclib.api.entity.EntityType.BLOCK_DISPLAY, position, services);
         this.blockDisplayAppearance = new EntityLibBlockDisplayAppearance(this);
         this.appearance = blockDisplayAppearance;
     }

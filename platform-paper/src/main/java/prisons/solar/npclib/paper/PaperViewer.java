@@ -27,7 +27,7 @@ public class PaperViewer implements Viewer {
     public @NotNull Position position() {
         var loc = player.getLocation();
         return Position.of(
-                loc.getWorld().getName(),
+                loc.getWorld().getUID().toString(),
                 loc.getX(),
                 loc.getY(),
                 loc.getZ(),
