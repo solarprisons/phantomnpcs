@@ -35,16 +35,6 @@ bin/
 # Plugin JARs (optional – remove if you commit artifacts)
 *.jar
 
-# Runtime server folders (if repo lives near server dir)
-run/
-server/
-paper/
-plugins/
-world/
-world_nether/
-world_the_end/
-cache/
-
 # ===============================
 # Testing / profiling
 # ===============================
@@ -68,3 +58,4 @@ replay_pid*
 # ===============================
 tmp/
 temp/
+protocol-packetevents/
