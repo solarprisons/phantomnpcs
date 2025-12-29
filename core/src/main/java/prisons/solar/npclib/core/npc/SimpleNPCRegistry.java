@@ -45,9 +45,13 @@ public class SimpleNPCRegistry implements NPCRegistry {
         if (npc instanceof AbstractNPC<?> abstractNpc) {
             int entityId = platform.allocateEntityId();
             abstractNpc.setEntityId(entityId);
-            abstractNpc.setState(NPCState.REGISTERED);
 
-            npcsById.put(npc.id(), npc);
+            // Atomically transition from UNREGISTERED to REGISTERED
+            if (!abstractNpc.compareAndSetState(NPCState.UNREGISTERED, NPCState.REGISTERED)) {
+                throw new IllegalStateException("NPC state changed during registration");
+            }
+
+            npcsById.put(npc.getId(), npc);
             npcsByEntityId.put(entityId, npc);
         }
     }
@@ -63,9 +67,17 @@ public class SimpleNPCRegistry implements NPCRegistry {
 
         if (npc instanceof AbstractNPC<?> abstractNpc) {
             abstractNpc.setState(NPCState.UNREGISTERED);
+
+            // Unregister goal selector from NPCEngine
+            var services = abstractNpc.getServices();
+            if (services != null) {
+                services.get(prisons.solar.npclib.core.engine.NPCEngine.class).ifPresent(engine ->
+                    engine.unregisterGoalSelector(npc)
+                );
+            }
         }
 
-        npcsById.remove(npc.id());
+        npcsById.remove(npc.getId());
         npcsByEntityId.remove(npc.entityId());
     }
 
@@ -95,14 +107,14 @@ public class SimpleNPCRegistry implements NPCRegistry {
     public @NotNull Collection<NPC<?>> inRange(@NotNull Position center, double radius) {
         double radiusSq = radius * radius;
         return npcsById.values().stream()
-                .filter(npc -> npc.position().distanceSquared(center) <= radiusSq)
+                .filter(npc -> npc.getPosition().distanceSquared(center) <= radiusSq)
                 .collect(Collectors.toUnmodifiableList());
     }
 
     @Override
     public @NotNull Collection<NPC<?>> inWorld(@NotNull String worldId) {
         return npcsById.values().stream()
-                .filter(npc -> npc.position().worldId().equals(worldId))
+                .filter(npc -> npc.getPosition().worldId().equals(worldId))
                 .collect(Collectors.toUnmodifiableList());
     }
 

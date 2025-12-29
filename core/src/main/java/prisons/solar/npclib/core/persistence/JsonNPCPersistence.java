@@ -2,7 +2,6 @@ package prisons.solar.npclib.core.persistence;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.appearance.PlayerAppearance;
 import prisons.solar.npclib.api.entity.EntityType;
@@ -54,13 +53,13 @@ public class JsonNPCPersistence implements NPCPersistence {
     public CompletableFuture<Void> save(@NotNull NPC<?> npc) {
         return CompletableFuture.runAsync(() -> {
             NPCData data = toData(npc);
-            Path file = directory.resolve(npc.id() + ".json");
+            Path file = directory.resolve(npc.getId() + ".json");
 
             try {
                 String json = gson.toJson(new SerializableNPCData(data));
                 Files.writeString(file, json);
             } catch (IOException e) {
-                throw new RuntimeException("Failed to save NPC: " + npc.id(), e);
+                throw new RuntimeException("Failed to save NPC: " + npc.getId(), e);
             }
         }, EXECUTOR);
     }
@@ -70,13 +69,13 @@ public class JsonNPCPersistence implements NPCPersistence {
         return CompletableFuture.runAsync(() -> {
             for (NPC<?> npc : npcs) {
                 NPCData data = toData(npc);
-                Path file = directory.resolve(npc.id() + ".json");
+                Path file = directory.resolve(npc.getId() + ".json");
 
                 try {
                     String json = gson.toJson(new SerializableNPCData(data));
                     Files.writeString(file, json);
                 } catch (IOException e) {
-                    throw new RuntimeException("Failed to save NPC: " + npc.id(), e);
+                    throw new RuntimeException("Failed to save NPC: " + npc.getId(), e);
                 }
             }
         }, EXECUTOR);
@@ -154,9 +153,9 @@ public class JsonNPCPersistence implements NPCPersistence {
 
     private NPCData toData(NPC<?> npc) {
         NPCData.Builder builder = NPCData.builder()
-                .id(npc.id())
+                .id(npc.getId())
                 .entityType(npc.entityType())
-                .position(npc.position())
+                .position(npc.getPosition())
                 .customName(npc.appearance().getCustomName());
 
         // Add skin for player NPCs
@@ -169,8 +168,12 @@ public class JsonNPCPersistence implements NPCPersistence {
 
     /**
      * Serializable wrapper for NPCData.
+     * Schema version 1: Initial format with world UUID support
      */
     private static class SerializableNPCData {
+        private static final int CURRENT_VERSION = 1;
+
+        int version = CURRENT_VERSION;
         String id;
         String entityType;
         String worldId;
@@ -184,6 +187,7 @@ public class JsonNPCPersistence implements NPCPersistence {
         SerializableNPCData() {}
 
         SerializableNPCData(NPCData data) {
+            this.version = CURRENT_VERSION;
             this.id = data.id().toString();
             this.entityType = data.entityType().name();
             this.worldId = data.position().worldId();
@@ -203,6 +207,20 @@ public class JsonNPCPersistence implements NPCPersistence {
         }
 
         NPCData toNPCData() {
+            // Version validation - reject unknown future versions
+            if (version > CURRENT_VERSION) {
+                throw new IllegalStateException(
+                        "Cannot load NPC data with schema version " + version +
+                        " (current version: " + CURRENT_VERSION + "). " +
+                        "Please update the library to load this NPC."
+                );
+            }
+
+            // Default version to 1 for legacy data without version field
+            if (version == 0) {
+                version = 1;
+            }
+
             PlayerAppearance.Skin skin = null;
             if (skinTexture != null) {
                 skin = PlayerAppearance.Skin.of(skinTexture, skinSignature);

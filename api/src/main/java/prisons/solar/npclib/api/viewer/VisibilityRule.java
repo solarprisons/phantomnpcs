@@ -73,7 +73,7 @@ public interface VisibilityRule {
      */
     static VisibilityRule withinDistance(double maxDistance) {
         double maxDistSq = maxDistance * maxDistance;
-        return (viewer, npc) -> viewer.position().distanceSquared(npc.position()) <= maxDistSq;
+        return (viewer, npc) -> viewer.position().distanceSquared(npc.getPosition()) <= maxDistSq;
     }
 
     /**
@@ -94,6 +94,6 @@ public interface VisibilityRule {
      */
     static VisibilityRule inWorld(@NotNull String worldId) {
         return (viewer, npc) -> viewer.position().worldId().equals(worldId)
-                && npc.position().worldId().equals(worldId);
+                && npc.getPosition().worldId().equals(worldId);
     }
 }

@@ -1,6 +1,8 @@
 package prisons.solar.npclib.api;
 
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.combat.CombatHandler;
+import prisons.solar.npclib.api.combat.DamageCalculator;
 import prisons.solar.npclib.api.event.EventBus;
 import prisons.solar.npclib.api.npc.NPCRegistry;
 import prisons.solar.npclib.api.service.ServiceRegistry;
@@ -11,6 +13,16 @@ import prisons.solar.npclib.api.viewer.ViewerTracker;
  * Each instance is independent - multiple plugins can have their own Phantom instance.
  */
 public interface Phantom {
+
+    default void setCombatHandler(CombatHandler handler){
+        services().register(CombatHandler.class, handler, 0);
+    }
+
+    default void setDamageCalculator(DamageCalculator calc){
+        services().register(DamageCalculator.class, calc, 0);
+    }
+
+
 
     /**
      * Gets the NPC registry for creating and managing NPCs.
@@ -58,6 +70,17 @@ public interface Phantom {
      * @return true if enabled
      */
     boolean isEnabled();
+
+    /**
+     * Invalidates pathfinding cache around a block position.
+     * Call this when blocks are placed/broken to update NPC pathfinding.
+     *
+     * @param worldId world UUID
+     * @param x block X coordinate
+     * @param y block Y coordinate
+     * @param z block Z coordinate
+     */
+    void invalidatePathfindingCache(@NotNull String worldId, int x, int y, int z);
 
     /**
      * Creates a new builder for constructing a Phantom instance.

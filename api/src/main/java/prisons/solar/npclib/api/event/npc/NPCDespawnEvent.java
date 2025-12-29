@@ -1,4 +1,4 @@
-package prisons.solar.npclib.api.event;
+package prisons.solar.npclib.api.event.npc;
 
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.viewer.Viewer;

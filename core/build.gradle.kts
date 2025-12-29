@@ -13,4 +13,7 @@ dependencies {
 
     // TOML configuration
     implementation("io.github.wasabithumb:jtoml:1.3.0")
+
+    // Caffeine configuration - exposed in CollisionManager API
+    api("com.github.ben-manes.caffeine:caffeine:3.2.3")
 }

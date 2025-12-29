@@ -1,6 +1,7 @@
 package prisons.solar.npclib.api.event;
 
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.event.npc.NPCEvent;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
