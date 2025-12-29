@@ -1,16 +1,20 @@
 package prisons.solar.npclib.api.npc;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import prisons.solar.npclib.api.ai.GoalSelector;
 import prisons.solar.npclib.api.animation.NPCAnimation;
 import prisons.solar.npclib.api.appearance.NPCAppearance;
-import prisons.solar.npclib.api.combat.Combatant;
+import prisons.solar.npclib.api.component.Component;
 import prisons.solar.npclib.api.entity.EntityType;
 import prisons.solar.npclib.api.interaction.InteractionHandler;
+import prisons.solar.npclib.api.math.Vector3d;
 import prisons.solar.npclib.api.metadata.NPCMetadata;
 import prisons.solar.npclib.api.status.EntityStatus;
 import prisons.solar.npclib.api.viewer.Viewer;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -18,28 +22,84 @@ import java.util.function.Consumer;
  * Represents a packet-based NPC entity.
  * NPCs are client-side only and do not exist as real server entities.
  *
+ * <p>NPCs use a component-based architecture for optional capabilities.
+ * Use {@link #addComponent(Component)} to attach features like combat,
+ * health, or custom behaviors.
+ *
  * @param <A> the appearance type for this NPC
+ * @see prisons.solar.npclib.api.component.Component
+ * @see prisons.solar.npclib.api.component.CombatantComponent
  */
-public interface NPC<A extends NPCAppearance> extends Combatant {
+public interface NPC<A extends NPCAppearance> {
 
     /**
      * Gets the unique identifier for this NPC.
      *
      * @return the NPC's UUID
      */
-    @NotNull UUID id();
+    @NotNull UUID getId();
 
-    // Combatant interface implementations
-
-    @Override
-    default UUID getId() {
-        return id();
-    }
-
-    @Override
+    /**
+     * Gets the display name for this NPC.
+     * Defaults to the entity type name.
+     *
+     * @return the NPC's name
+     */
     default String getName() {
         return entityType().name();
     }
+
+    /**
+     * Gets the current position of this NPC.
+     *
+     * @return the position
+     */
+    @NotNull Position getPosition();
+
+    // Component methods
+
+    /**
+     * Gets a component of the specified type.
+     *
+     * @param type the component class
+     * @param <T>  the component type
+     * @return optional containing the component, or empty if not present
+     */
+    <T extends Component> Optional<T> getComponent(@NotNull Class<T> type);
+
+    /**
+     * Adds a component to this NPC.
+     * If a component of the same type already exists, it is replaced.
+     *
+     * @param component the component to add
+     * @param <T>       the component type
+     * @return the added component
+     */
+    <T extends Component> T addComponent(@NotNull T component);
+
+    /**
+     * Removes a component of the specified type.
+     *
+     * @param type the component class
+     * @param <T>  the component type
+     * @return true if a component was removed
+     */
+    <T extends Component> boolean removeComponent(@NotNull Class<T> type);
+
+    /**
+     * Checks if this NPC has a component of the specified type.
+     *
+     * @param type the component class
+     * @return true if the component is present
+     */
+    boolean hasComponent(@NotNull Class<? extends Component> type);
+
+    /**
+     * Gets all components attached to this NPC.
+     *
+     * @return unmodifiable collection of components
+     */
+    @NotNull Collection<Component> getComponents();
 
     /**
      * Gets the entity ID used for packets.
@@ -62,13 +122,6 @@ public interface NPC<A extends NPCAppearance> extends Combatant {
      * @return the NPC state
      */
     @NotNull NPCState state();
-
-    /**
-     * Gets the current position of this NPC.
-     *
-     * @return the position
-     */
-    @NotNull Position position();
 
     /**
      * Gets the metadata container for this NPC.
@@ -121,10 +174,19 @@ public interface NPC<A extends NPCAppearance> extends Combatant {
 
     /**
      * Teleports this NPC to a new position.
+     * By default, this resets velocity to zero.
      *
      * @param position the new position
      */
     void teleport(@NotNull Position position);
+
+    /**
+     * Teleports this NPC to a new position with velocity control.
+     *
+     * @param position the new position
+     * @param keepVelocity if true, preserve current velocity; if false, reset to zero
+     */
+    void teleport(@NotNull Position position, boolean keepVelocity);
 
     /**
      * Makes the NPC look at a position.
@@ -139,6 +201,89 @@ public interface NPC<A extends NPCAppearance> extends Combatant {
      * @param viewer the viewer to look at
      */
     void lookAt(@NotNull Viewer viewer);
+
+    // AI methods
+
+    /**
+     * Gets the goal selector for this NPC.
+     * The goal selector manages AI goals and behaviors.
+     *
+     * @return the goal selector, or null if AI is not enabled
+     */
+    @Nullable GoalSelector getGoalSelector();
+
+    // Physics methods
+
+    /**
+     * Enable physics simulation for this NPC.
+     * Physics will be activated when the NPC enters SPAWNED state.
+     * This is opt-in only - physics is not enabled by default.
+     */
+    void enablePhysics();
+
+    /**
+     * Disable physics simulation for this NPC.
+     * Stops all velocity and removes from physics engine.
+     */
+    void disablePhysics();
+
+    /**
+     * Check if physics is enabled for this NPC.
+     *
+     * @return true if physics is enabled
+     */
+    boolean hasPhysics();
+
+    /**
+     * Apply an impulse (instant velocity change) to this NPC.
+     * Only works if physics is enabled.
+     *
+     * @param impulse the velocity to add
+     */
+    void applyImpulse(@NotNull Vector3d impulse);
+
+    /**
+     * Get the current velocity of this NPC.
+     * Returns ZERO if physics is not enabled.
+     *
+     * @return current velocity vector
+     */
+    @NotNull Vector3d getVelocity();
+
+    /**
+     * Set the velocity of this NPC.
+     * Only works if physics is enabled.
+     *
+     * @param velocity new velocity vector
+     */
+    void setVelocity(@NotNull Vector3d velocity);
+
+    /**
+     * Set the target velocity that this NPC should maintain.
+     * When set, the NPC will continuously maintain this velocity (no friction applied).
+     * Useful for constant movement like sprinting in a direction.
+     * Set to null to disable and allow natural friction/deceleration.
+     * Only works if physics is enabled.
+     *
+     * @param targetVelocity target velocity to maintain, or null to disable
+     */
+    void setTargetVelocity(@NotNull Vector3d targetVelocity);
+
+    /**
+     * Get the target velocity this NPC is trying to maintain.
+     * Returns ZERO if physics is not enabled or no target velocity is set.
+     *
+     * @return target velocity vector, or ZERO if not set
+     */
+    @NotNull Vector3d getTargetVelocity();
+
+    /**
+     * Check if this NPC is on the ground.
+     * Only valid if physics is enabled.
+     *
+     * @return true if on ground, false if airborne or physics disabled
+     */
+    boolean isOnGround();
 
     // Viewer methods
 
