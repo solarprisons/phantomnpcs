@@ -97,17 +97,28 @@ public class DefaultHealthComponent implements HealthComponent {
         health = Math.max(0, health - amount);
         boolean killed = health <= 0;
 
+        DamageResult result = new DamageResult(amount, before, health, killed, false);
+
+        // Fire damage listeners
+        damageListeners.forEach(l -> l.accept(null));
+
         if (killed) {
             dead = true;
+            // Fire death listeners
+            deathListeners.forEach(l -> l.accept(null));
         }
 
-        return new DamageResult(amount, before, health, killed, false);
+        return result;
     }
 
     @Override
     public void kill() {
-        health = 0;
-        dead = true;
+        if (!dead) {
+            health = 0;
+            dead = true;
+            // Fire death listeners
+            deathListeners.forEach(l -> l.accept(null));
+        }
     }
 
     @Override
