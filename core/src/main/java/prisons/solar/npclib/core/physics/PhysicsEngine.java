@@ -298,6 +298,12 @@ public class PhysicsEngine {
         PhysicsState state = entities.get(npc.getId());
         if (state != null) {
             state.setVelocity(velocity);
+
+            // If velocity has positive Y (upward force like knockback/jump),
+            // mark as not on ground so physics applies correctly
+            if (velocity.getY() > 0.01) {
+                state.setOnGround(false);
+            }
         }
     }
 
@@ -337,9 +343,12 @@ public class PhysicsEngine {
     private static @NotNull Vector3d getVector3d(PhysicsState state, float deltaTime, NPC<?> npc) {
         Vector3d v = state.getVelocity();
         Vector3d targetVel = state.getTargetVelocity();
-        Position pos = npc.getPosition();
 
-        if (!state.isOnGround()) {
+        // CRITICAL: If velocity has significant upward component, treat as airborne
+        // This handles knockback/jumps even if onGround flag hasn't updated yet
+        boolean effectivelyOnGround = state.isOnGround() && v.getY() <= 0.1;
+
+        if (!effectivelyOnGround) {
             double force = GRAVITY * state.getGravityMultiplier() * deltaTime;
             v = v.add(0, force, 0);
 
