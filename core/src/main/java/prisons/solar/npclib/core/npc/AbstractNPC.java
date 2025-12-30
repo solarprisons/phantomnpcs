@@ -293,7 +293,7 @@ public abstract class AbstractNPC<A extends NPCAppearance> implements NPC<A>  {
     }
 
     @Override
-    public void setTargetVelocity(@NotNull Vector3d targetVelocity) {
+    public void setTargetVelocity(@Nullable Vector3d targetVelocity) {
         if (!physicsEnabled || services == null) {
             return;
         }
