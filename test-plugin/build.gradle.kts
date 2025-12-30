@@ -18,6 +18,9 @@ tasks.shadowJar {
 
     // Don't relocate - this is a test plugin
     // Relocation causes issues with records and lambdas
+
+    // Ensure platform-paper is built first
+    dependsOn(project(":platform-paper").tasks.named("shadowJar"))
 }
 
 tasks.build {

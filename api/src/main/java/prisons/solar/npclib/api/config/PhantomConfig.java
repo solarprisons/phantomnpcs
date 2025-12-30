@@ -78,6 +78,13 @@ public interface PhantomConfig {
     boolean debug();
 
     /**
+     * Whether update checking is enabled.
+     *
+     * @return true if update checking is enabled
+     */
+    boolean updateChecker();
+
+    /**
      * Creates a builder for configuration.
      *
      * @return new builder
@@ -100,6 +107,7 @@ public interface PhantomConfig {
         private int packetBatchFlushInterval = 50;
         private int skinCacheDuration = 60;
         private boolean debug = false;
+        private boolean updateChecker = true;
 
         public Builder viewDistance(double distance) {
             this.viewDistance = distance;
@@ -151,11 +159,16 @@ public interface PhantomConfig {
             return this;
         }
 
+        public Builder updateChecker(boolean enabled) {
+            this.updateChecker = enabled;
+            return this;
+        }
+
         public PhantomConfig build() {
             return new SimplePhantomConfig(
                     viewDistance, visibilityTickRate, aiTickRate, proximityTickRate,
                     asyncVisibility, packetBatching, packetBatchSize, packetBatchFlushInterval,
-                    skinCacheDuration, debug
+                    skinCacheDuration, debug, updateChecker
             );
         }
     }
@@ -173,6 +186,7 @@ public interface PhantomConfig {
             int packetBatchSize,
             int packetBatchFlushInterval,
             int skinCacheDuration,
-            boolean debug
+            boolean debug,
+            boolean updateChecker
     ) implements PhantomConfig {}
 }

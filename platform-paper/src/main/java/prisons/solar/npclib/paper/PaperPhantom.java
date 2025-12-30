@@ -44,6 +44,7 @@ import prisons.solar.npclib.core.physics.PhysicsEngine;
 import prisons.solar.npclib.core.physics.CollisionManager;
 import prisons.solar.npclib.core.ai.pathfinding.PathfindingService;
 import prisons.solar.npclib.api.ai.pathfinding.PathfindingComponent;
+import prisons.solar.npclib.paper.update.UpdateChecker;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -316,6 +317,13 @@ public class PaperPhantom implements Phantom {
         );
 
         plugin.getLogger().info("[Phantom] Enabled with view distance " + config.viewDistance() + " blocks");
+
+        // Check for updates
+        String owner = PhantomVersion.getGitHubOwner();
+        String repo = PhantomVersion.getGitHubRepo();
+        if (config.updateChecker() && owner != null && repo != null) {
+            new UpdateChecker(plugin, owner, repo, PhantomVersion.getVersion()).checkAndNotify();
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -587,6 +595,17 @@ public class PaperPhantom implements Phantom {
          */
         public @NotNull Builder debug(boolean enabled) {
             ensureConfigBuilder().debug(enabled);
+            return this;
+        }
+
+        /**
+         * Enables or disables update checking via GitHub Releases API.
+         *
+         * @param enabled true to enable (default)
+         * @return this builder
+         */
+        public @NotNull Builder updateChecker(boolean enabled) {
+            ensureConfigBuilder().updateChecker(enabled);
             return this;
         }
 
