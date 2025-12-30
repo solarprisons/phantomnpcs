@@ -10,6 +10,8 @@ import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.protocol.world.Location;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
+import net.kyori.adventure.text.format.NamedTextColor;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import me.tofaa.entitylib.meta.types.PlayerMeta;
 import me.tofaa.entitylib.wrapper.WrapperPlayer;
@@ -301,6 +303,11 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
 
         ensureWrapperPlayer();
 
+        // Send team packet BEFORE spawn to prevent nametag flash
+        if (!playerAppearance.isCustomNameVisible()) {
+            sendNametagHideTeamPacket(paperViewer);
+        }
+
         Location location = new Location(
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
@@ -312,6 +319,9 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
 
         // Add viewer - EntityLib will send spawn packets to this viewer
         wrapperPlayer.addViewer(paperViewer.getPlayer().getUniqueId());
+
+        // Sync equipment AFTER adding viewer so they receive the equipment packets
+        syncEquipment();
 
         // Send skin layers with correct metadata index (16) - EntityLib uses wrong index
         byte skinMask = playerAppearance.getSkinLayerMask();
@@ -374,6 +384,7 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
             wrapperPlayer.setInTablist(true);
 
             syncMetadataToWrapper();
+            syncEquipment(); // Sync equipment that was set before wrapper existed
         }
     }
 
@@ -432,5 +443,54 @@ public class EntityLibPlayerNPC extends AbstractNPC<PlayerAppearance> {
     @Override
     public String getName() {
         return "";
+    }
+
+    /**
+     * Sends a team packet to hide this NPC's nametag from a viewer.
+     * Creates a team with NAME_TAG_VISIBILITY = NEVER and adds the NPC to it.
+     */
+    private void sendNametagHideTeamPacket(PaperViewer viewer) {
+        // Use NPC UUID as team name to ensure uniqueness
+        String teamName = "ph_" + id.toString().substring(0, 8);
+        String npcName = playerAppearance.getDisplayName();
+
+        // Create team info with nametag visibility set to NEVER
+        WrapperPlayServerTeams.ScoreBoardTeamInfo teamInfo = new WrapperPlayServerTeams.ScoreBoardTeamInfo(
+                Component.empty(),                                    // Display name
+                Component.empty(),                                    // Prefix
+                Component.empty(),                                    // Suffix
+                WrapperPlayServerTeams.NameTagVisibility.NEVER,       // Hide nametag
+                WrapperPlayServerTeams.CollisionRule.NEVER,           // No collision
+                NamedTextColor.WHITE,                                 // Color
+                WrapperPlayServerTeams.OptionData.NONE                // Options
+        );
+
+        // Create team packet with the NPC as a member
+        WrapperPlayServerTeams teamPacket = new WrapperPlayServerTeams(
+                teamName,
+                WrapperPlayServerTeams.TeamMode.CREATE,
+                teamInfo,
+                npcName  // Add NPC to the team
+        );
+
+        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer.getPlayer(), teamPacket);
+    }
+
+    /**
+     * Sends a team packet to show this NPC's nametag to a viewer (removes from hidden team).
+     */
+    private void sendNametagShowTeamPacket(PaperViewer viewer) {
+        String teamName = "ph_" + id.toString().substring(0, 8);
+        String npcName = playerAppearance.getDisplayName();
+
+        // Remove NPC from the hidden team
+        WrapperPlayServerTeams teamPacket = new WrapperPlayServerTeams(
+                teamName,
+                WrapperPlayServerTeams.TeamMode.REMOVE_ENTITIES,
+                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
+                npcName
+        );
+
+        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer.getPlayer(), teamPacket);
     }
 }

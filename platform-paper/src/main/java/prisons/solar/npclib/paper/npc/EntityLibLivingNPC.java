@@ -267,6 +267,9 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
                 position.x(), position.y(), position.z(), position.yaw(), position.pitch()
         );
         wrapperEntity.spawn(location);
+
+        // Sync equipment AFTER adding viewer so they receive the equipment packets
+        syncEquipment();
     }
 
     @Override
@@ -301,6 +304,7 @@ public class EntityLibLivingNPC extends AbstractNPC<LivingAppearance> {
             com.github.retrooper.packetevents.protocol.entity.type.EntityType peType = convertEntityType(entityType);
             wrapperEntity = new WrapperLivingEntity(entityId, id, peType);
             syncMetadataToWrapper();
+            syncEquipment(); // Sync equipment that was set before wrapper existed
         }
     }
 
