@@ -176,6 +176,21 @@ public class EntityLibPlayerAppearance implements PlayerAppearance {
     }
 
     @Override
+    public CompletableFuture<Void> setSkinFromURL(@NotNull String url) {
+        if (skinManager == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("SkinManager not configured"));
+        }
+
+        return skinManager.fetchByURL(url)
+                .thenAccept(fetchedSkin -> {
+                    if (fetchedSkin != null) {
+                        npc.updateSkin(fetchedSkin);
+                    }
+                });
+    }
+
+    @Override
     public void setSkinLayerVisible(@NotNull SkinLayer layer, boolean visible) {
         if (visible) {
             visibleSkinLayers.add(layer);

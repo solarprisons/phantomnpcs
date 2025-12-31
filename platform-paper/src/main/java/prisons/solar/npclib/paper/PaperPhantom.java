@@ -492,9 +492,21 @@ public class PaperPhantom implements Phantom {
         private final Plugin plugin;
         private PhantomConfig config;
         private Path configPath;
+        private String mineSkinApiKey;
 
         private Builder(@NotNull Plugin plugin) {
             this.plugin = plugin;
+        }
+
+        /**
+         * Sets the MineSkin API key for URL-based skin fetching.
+         *
+         * @param apiKey the MineSkin API key
+         * @return this builder
+         */
+        public @NotNull Builder mineSkinApiKey(@NotNull String apiKey) {
+            this.mineSkinApiKey = apiKey;
+            return this;
         }
 
         @Override
@@ -641,7 +653,15 @@ public class PaperPhantom implements Phantom {
                 finalConfig = PhantomConfig.builder().build();
             }
 
-            return new PaperPhantom(plugin, finalConfig);
+            PaperPhantom phantom = new PaperPhantom(plugin, finalConfig);
+
+            // Configure MineSkin API key if provided
+            if (mineSkinApiKey != null && !mineSkinApiKey.isEmpty()) {
+                phantom.getSkinManager().setMineSkinApiKey(mineSkinApiKey);
+                phantom.getSkinManager().setLogger(plugin.getLogger());
+            }
+
+            return phantom;
         }
     }
 }

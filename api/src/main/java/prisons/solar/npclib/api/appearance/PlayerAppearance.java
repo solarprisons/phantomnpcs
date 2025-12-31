@@ -44,6 +44,16 @@ public interface PlayerAppearance extends LivingAppearance {
     CompletableFuture<Void> setSkinFromName(@NotNull String name);
 
     /**
+     * Sets the skin from a URL pointing to a skin image.
+     * This uses MineSkin API to generate signed texture data.
+     * Supports any direct PNG URL or skin site URLs (skinsmc.org, etc).
+     *
+     * @param url the URL to the skin image
+     * @return future that completes when skin is applied
+     */
+    CompletableFuture<Void> setSkinFromURL(@NotNull String url);
+
+    /**
      * Sets the skin layer visibility.
      *
      * @param layer   the skin layer
