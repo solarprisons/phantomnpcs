@@ -26,7 +26,7 @@ public class NavigateToPositionGoal implements Goal {
     private static final int MAX_PATH_RETRIES = 3;
     private static final long PATH_COOLDOWN_MS = 2000;
     private static final double BASE_STEP_UP_HORIZONTAL_THRESHOLD = 1.5;
-    private static final long STUCK_THRESHOLD_MS = 250;
+    private static final long STUCK_THRESHOLD_MS = 3000; // 3 seconds
     private static final double BASE_STUCK_DISTANCE_THRESHOLD = 0.1;
     private static final double BASE_WAYPOINT_THRESHOLD = 0.5;
 
@@ -142,7 +142,7 @@ public class NavigateToPositionGoal implements Goal {
 
     @Override
     public int flags() {
-        return Flag.MOVE.bit;
+        return Flag.MOVE.bit | Flag.LOOK.bit;
     }
 
     @Override
@@ -294,6 +294,9 @@ public class NavigateToPositionGoal implements Goal {
         double dy = waypoint.y() - current.y();  // Positive = up, negative = down
         double dz = waypoint.z() - current.z();
         double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+
+        // Look toward waypoint while moving
+        npc.lookAt(waypoint);
 
         // Apply horizontal velocity using targetVelocity for continuous movement
         // Using setVelocity() causes friction decay every tick, making NPCs slow

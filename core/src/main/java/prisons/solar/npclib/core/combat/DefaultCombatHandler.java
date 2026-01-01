@@ -15,7 +15,8 @@ public class DefaultCombatHandler implements CombatHandler {
                 HealthComponent.DamageType.ENTITY_ATTACK,
                 attacker,
                 null,
-                target.getPosition()
+                target.getPosition(),
+                false // Critical hits should be calculated at the interaction layer
         );
 
         HealthComponent h = target.healthComponent();

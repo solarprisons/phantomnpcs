@@ -22,7 +22,7 @@ import java.util.UUID;
  * // Later, damage the NPC
  * npc.getComponent(CombatantComponent.class).ifPresent(c -> {
  *     c.healthComponent().damage(
- *         new DamageSource(DamageType.ENTITY_ATTACK, attacker, null, attacker.getPosition()),
+ *         new DamageSource(DamageType.ENTITY_ATTACK, attacker, null, attacker.getPosition(), isCritical),
  *         5.0f
  *     );
  * });
