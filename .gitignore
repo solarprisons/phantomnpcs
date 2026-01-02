@@ -58,4 +58,6 @@ replay_pid*
 # ===============================
 tmp/
 temp/
-com/github/retrooper/packetevents
+
+# Accidentally extracted library sources
+/com/
