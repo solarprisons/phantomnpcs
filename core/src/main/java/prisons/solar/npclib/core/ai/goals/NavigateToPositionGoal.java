@@ -26,7 +26,7 @@ public class NavigateToPositionGoal implements Goal {
     private static final int MAX_PATH_RETRIES = 3;
     private static final long PATH_COOLDOWN_MS = 2000;
     private static final double BASE_STEP_UP_HORIZONTAL_THRESHOLD = 1.5;
-    private static final long STUCK_THRESHOLD_MS = 250;
+    private static final long STUCK_THRESHOLD_MS = 3000; // 3 seconds
     private static final double BASE_STUCK_DISTANCE_THRESHOLD = 0.1;
     private static final double BASE_WAYPOINT_THRESHOLD = 0.5;
 
@@ -142,7 +142,7 @@ public class NavigateToPositionGoal implements Goal {
 
     @Override
     public int flags() {
-        return Flag.MOVE.bit;
+        return Flag.MOVE.bit | Flag.LOOK.bit;
     }
 
     @Override
@@ -295,7 +295,11 @@ public class NavigateToPositionGoal implements Goal {
         double dz = waypoint.z() - current.z();
         double horizontalDist = Math.sqrt(dx * dx + dz * dz);
 
-        // Apply horizontal velocity
+        // Look toward waypoint while moving
+        npc.lookAt(waypoint);
+
+        // Apply horizontal velocity using targetVelocity for continuous movement
+        // Using setVelocity() causes friction decay every tick, making NPCs slow
         double vx = 0;
         double vz = 0;
         if (horizontalDist > 0.1) {
@@ -303,8 +307,14 @@ public class NavigateToPositionGoal implements Goal {
             vz = (dz / horizontalDist) * speed;
         }
 
+        // Preserve Y velocity from current velocity (for knockback, jumping, falling)
+        // Only set horizontal components in targetVelocity
         Vector3d currentVel = npc.getVelocity();
-        npc.setVelocity(new Vector3d(vx, currentVel.getY(), vz));
+        double preserveY = currentVel.getY();
+
+        // Use targetVelocity so physics engine maintains speed without friction decay
+        // Preserve Y component to allow knockback/jumping to work
+        npc.setTargetVelocity(new Vector3d(vx, preserveY, vz));
 
         // Handle vertical transitions
         // For UPWARD jumps: allow larger horizontal distance (2-block gap jumps)
@@ -328,6 +338,7 @@ public class NavigateToPositionGoal implements Goal {
      * Teleports NPC to waypoint position (X, Y, Z), validating the position is safe.
      * Used for both upward (jumps/steps) and small downward (1 block drops) movement.
      * Teleports to waypoint's X/Z (block center) to prevent edge-sticking.
+     * Preserves upward velocity (knockback/jump) to allow physics to continue the motion.
      */
     private void performVerticalTeleport(NPC<?> npc, Position current, Position waypoint, double dy) {
         // Teleport to waypoint's full position (block center X/Z + correct Y)
@@ -344,16 +355,22 @@ public class NavigateToPositionGoal implements Goal {
         // Check if target position is safe (not inside solid blocks)
         if (isPositionSafe(targetPos)) {
             npc.teleport(targetPos, true);
-            // Zero out vertical velocity after teleport to prevent drift
+            // Preserve upward velocity (knockback/jump), only zero if falling
             Vector3d vel = npc.getVelocity();
-            npc.setVelocity(new Vector3d(vel.getX(), 0, vel.getZ()));
+            if (vel.getY() < 0) {
+                // Only zero Y velocity if we were falling - teleport landed us
+                npc.setVelocity(new Vector3d(vel.getX(), 0, vel.getZ()));
+            }
+            // If vel.Y > 0 (knockback/jump), preserve it so physics continues the arc
         } else {
             // Target unsafe - try to find safe Y by scanning
             Position safePos = findSafePosition(targetPos);
             if (safePos != null) {
                 npc.teleport(safePos, true);
                 Vector3d vel = npc.getVelocity();
-                npc.setVelocity(new Vector3d(vel.getX(), 0, vel.getZ()));
+                if (vel.getY() < 0) {
+                    npc.setVelocity(new Vector3d(vel.getX(), 0, vel.getZ()));
+                }
             }
             // If no safe position found, let physics handle it
         }
@@ -493,9 +510,12 @@ public class NavigateToPositionGoal implements Goal {
     }
 
     /**
-     * Stops horizontal movement, preserving vertical velocity for landing.
+     * Stops horizontal movement, clearing target velocity and preserving vertical for landing.
      */
     private void stopMovement(NPC<?> npc) {
+        // Clear target velocity so friction can naturally stop the NPC
+        npc.setTargetVelocity(null);
+        // Also zero out current horizontal velocity
         Vector3d currentVel = npc.getVelocity();
         npc.setVelocity(new Vector3d(0, currentVel.getY(), 0));
     }

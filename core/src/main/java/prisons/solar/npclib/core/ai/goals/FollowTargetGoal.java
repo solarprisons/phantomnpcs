@@ -172,10 +172,13 @@ public final class FollowTargetGoal implements Goal {
         }
 
         // Navigation finished but still far - teleport if allowed
+        // IMPORTANT: Always teleport to a GROUNDED position to prevent floating
+        // Even with mimicVerticalMovement, we find ground below target first
         if (navigationGoal != null && navigationGoal.isNavigationFinished()) {
-            if (mimicVerticalMovement || isPositionGrounded(targetPos)) {
-                npc.teleport(targetPos);
-                navigationGoal = createNavigationGoal(targetPos);
+            Position groundedTarget = findGroundedPosition(targetPos);
+            if (groundedTarget != null) {
+                npc.teleport(groundedTarget);
+                navigationGoal = createNavigationGoal(targetPos); // Still path to actual target
                 navigationGoal.start(npc);
             }
             return;
@@ -224,5 +227,44 @@ public final class FollowTargetGoal implements Goal {
 
         BlockPosition below = BlockPosition.of(pos.worldId(), blockX, blockY - 1, blockZ);
         return worldProvider.isBlockSolid(below);
+    }
+
+    /**
+     * Finds a grounded position near the target.
+     * Searches downward from target position to find solid ground.
+     * Returns null if no ground found within 10 blocks.
+     *
+     * @param pos the target position
+     * @return a grounded position, or null if no ground found
+     */
+    @Nullable
+    private Position findGroundedPosition(Position pos) {
+        int blockX = (int) Math.floor(pos.x());
+        int blockY = (int) Math.floor(pos.y());
+        int blockZ = (int) Math.floor(pos.z());
+
+        // Search down up to 10 blocks for solid ground
+        for (int yOffset = 0; yOffset <= 10; yOffset++) {
+            int checkY = blockY - yOffset;
+            if (checkY < -64) break; // Don't go below world minimum
+
+            BlockPosition below = BlockPosition.of(pos.worldId(), blockX, checkY - 1, blockZ);
+            BlockPosition atPos = BlockPosition.of(pos.worldId(), blockX, checkY, blockZ);
+
+            // Ground found: block below is solid, block at position is not solid (can stand there)
+            if (worldProvider.isBlockSolid(below) && !worldProvider.isBlockSolid(atPos)) {
+                return Position.of(
+                    pos.worldId(),
+                    pos.x(),
+                    checkY,
+                    pos.z(),
+                    pos.yaw(),
+                    pos.pitch()
+                );
+            }
+        }
+
+        // No ground found
+        return null;
     }
 }

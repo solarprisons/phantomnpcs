@@ -53,6 +53,14 @@ public class SimpleNPCRegistry implements NPCRegistry {
 
             npcsById.put(npc.getId(), npc);
             npcsByEntityId.put(entityId, npc);
+
+            // Register goal selector with NPCEngine so it gets ticked
+            var services = abstractNpc.getServices();
+            if (services != null && npc.getGoalSelector() != null) {
+                services.get(prisons.solar.npclib.core.engine.NPCEngine.class).ifPresent(engine ->
+                    engine.registerGoalSelector(npc, npc.getGoalSelector())
+                );
+            }
         }
     }
 

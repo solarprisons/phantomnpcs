@@ -4,7 +4,10 @@ import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.event.EventBus;
 import prisons.solar.npclib.api.event.npc.NPCEvent;
 
-import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -66,14 +69,39 @@ public class SimpleEventBus implements EventBus {
     @Override
     @SuppressWarnings("unchecked")
     public <T extends NPCEvent> @NotNull T post(@NotNull T event) {
-        List<HandlerEntry<?>> list = handlers.get(event.getClass());
-        if (list != null) {
-            for (HandlerEntry<?> entry : list) {
-                try {
-                    ((Consumer<T>) entry.handler).accept(event);
-                } catch (Exception e) {
-                    // Swallow handler exceptions to prevent event propagation failures
-                }
+        // Collect all matching handlers (exact class + interfaces + superclasses)
+        Set<HandlerEntry<?>> matchingHandlers = new LinkedHashSet<>();
+
+        // Check exact class
+        List<HandlerEntry<?>> exactList = handlers.get(event.getClass());
+        if (exactList != null) {
+            matchingHandlers.addAll(exactList);
+        }
+
+        // Check interfaces (e.g., NPCSpawnEvent)
+        for (Class<?> iface : event.getClass().getInterfaces()) {
+            List<HandlerEntry<?>> ifaceList = handlers.get(iface);
+            if (ifaceList != null) {
+                matchingHandlers.addAll(ifaceList);
+            }
+        }
+
+        // Check superclasses
+        Class<?> superClass = event.getClass().getSuperclass();
+        while (superClass != null && NPCEvent.class.isAssignableFrom(superClass)) {
+            List<HandlerEntry<?>> superList = handlers.get(superClass);
+            if (superList != null) {
+                matchingHandlers.addAll(superList);
+            }
+            superClass = superClass.getSuperclass();
+        }
+
+        // Fire all matching handlers
+        for (HandlerEntry<?> entry : matchingHandlers) {
+            try {
+                ((Consumer<T>) entry.handler).accept(event);
+            } catch (Exception e) {
+                // Swallow handler exceptions to prevent event propagation failures
             }
         }
         return event;

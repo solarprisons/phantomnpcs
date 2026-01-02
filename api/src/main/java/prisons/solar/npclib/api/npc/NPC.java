@@ -267,7 +267,7 @@ public interface NPC<A extends NPCAppearance> {
      *
      * @param targetVelocity target velocity to maintain, or null to disable
      */
-    void setTargetVelocity(@NotNull Vector3d targetVelocity);
+    void setTargetVelocity(@Nullable Vector3d targetVelocity);
 
     /**
      * Get the target velocity this NPC is trying to maintain.

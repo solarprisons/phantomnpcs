@@ -26,7 +26,7 @@ import java.util.function.Consumer;
  * health.onDeath(event -> System.out.println("Died!"));
  *
  * // Deal damage
- * DamageSource source = new DamageSource(DamageType.ENTITY_ATTACK, attacker, null, pos);
+ * DamageSource source = new DamageSource(DamageType.ENTITY_ATTACK, attacker, null, pos, isCritical);
  * DamageResult result = health.damage(source, 5.0f);
  * }</pre>
  *
@@ -152,13 +152,29 @@ public interface HealthComponent {
      * @param attacker   the attacking combatant, or null if environmental
      * @param projectile the projectile that caused damage, or null
      * @param location   the location where damage originated
+     * @param isCritical whether this was a critical hit (vanilla 1.9+ mechanics)
      */
     record DamageSource(
             DamageType type,
             @Nullable Combatant attacker,
             @Nullable ProjectileEntity projectile,
-            Position location
-    ) {}
+            Position location,
+            boolean isCritical
+    ) {
+        /**
+         * Creates a non-critical damage source.
+         *
+         * @param type       the type of damage
+         * @param attacker   the attacking combatant, or null if environmental
+         * @param projectile the projectile that caused damage, or null
+         * @param location   the location where damage originated
+         * @return a new DamageSource with isCritical set to false
+         */
+        public static DamageSource of(DamageType type, @Nullable Combatant attacker,
+                                       @Nullable ProjectileEntity projectile, Position location) {
+            return new DamageSource(type, attacker, projectile, location, false);
+        }
+    }
 
     /**
      * Represents the result of a damage operation.
