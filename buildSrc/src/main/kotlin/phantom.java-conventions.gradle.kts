@@ -42,6 +42,43 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+
+            pom {
+                name.set(project.name)
+                description.set(project.description ?: "Phantom NPC Library")
+                url.set("https://github.com/solarprisons/phantomnpcs")
+
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("solarprisons")
+                        name.set("Solar Prisons")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com/solarprisons/phantomnpcs.git")
+                    developerConnection.set("scm:git:ssh://github.com/solarprisons/phantomnpcs.git")
+                    url.set("https://github.com/solarprisons/phantomnpcs")
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/solarprisons/phantomnpcs")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: findProperty("gpr.user") as String?
+                password = System.getenv("GITHUB_TOKEN") ?: findProperty("gpr.key") as String?
+            }
         }
     }
 }
