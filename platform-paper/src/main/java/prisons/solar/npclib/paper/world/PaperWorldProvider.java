@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.util.BoundingBox;
 import org.jetbrains.annotations.NotNull;
 import prisons.solar.npclib.api.world.BlockPosition;
@@ -68,6 +70,99 @@ public class PaperWorldProvider implements WorldProvider {
         }
 
         return type.isSolid() || type.isOccluding();
+    }
+
+    @Override
+    public boolean isBlockWater(@NotNull BlockPosition position) {
+        World world = getWorld(position.worldId());
+        if (world == null) {
+            return false;
+        }
+
+        Block block = world.getBlockAt(position.x(), position.y(), position.z());
+        Material type = block.getType();
+
+        // Check for water blocks
+        if (type == Material.WATER) {
+            return true;
+        }
+
+        // Check for waterlogged blocks
+        BlockData blockData = block.getBlockData();
+        if (blockData instanceof Waterlogged waterlogged) {
+            return waterlogged.isWaterlogged();
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean isBlockLava(@NotNull BlockPosition position) {
+        World world = getWorld(position.worldId());
+        if (world == null) {
+            return false;
+        }
+
+        Block block = world.getBlockAt(position.x(), position.y(), position.z());
+        return block.getType() == Material.LAVA;
+    }
+
+    @Override
+    public boolean isBlockFire(@NotNull BlockPosition position) {
+        World world = getWorld(position.worldId());
+        if (world == null) {
+            return false;
+        }
+
+        Block block = world.getBlockAt(position.x(), position.y(), position.z());
+        Material type = block.getType();
+
+        return type == Material.FIRE ||
+               type == Material.SOUL_FIRE ||
+               type == Material.CAMPFIRE ||
+               type == Material.SOUL_CAMPFIRE;
+    }
+
+    @Override
+    public BubbleColumnType getBubbleColumnType(@NotNull BlockPosition position) {
+        World world = getWorld(position.worldId());
+        if (world == null) {
+            return BubbleColumnType.NONE;
+        }
+
+        Block block = world.getBlockAt(position.x(), position.y(), position.z());
+        if (block.getType() != Material.BUBBLE_COLUMN) {
+            return BubbleColumnType.NONE;
+        }
+
+        // Check the block below to determine direction
+        Block below = world.getBlockAt(position.x(), position.y() - 1, position.z());
+        Material belowType = below.getType();
+
+        if (belowType == Material.SOUL_SAND) {
+            return BubbleColumnType.UPWARD;
+        } else if (belowType == Material.MAGMA_BLOCK) {
+            return BubbleColumnType.DOWNWARD;
+        }
+
+        // Default to upward for bubble columns (standard behavior)
+        return BubbleColumnType.UPWARD;
+    }
+
+    @Override
+    public boolean isRainingAt(@NotNull BlockPosition position) {
+        World world = getWorld(position.worldId());
+        if (world == null) {
+            return false;
+        }
+
+        // Check if world has storm and position can see sky
+        if (!world.hasStorm()) {
+            return false;
+        }
+
+        Block block = world.getBlockAt(position.x(), position.y(), position.z());
+        return block.getLightFromSky() >= 15 && world.getHighestBlockYAt(position.x(), position.z()) <= position.y();
     }
 
     @Override

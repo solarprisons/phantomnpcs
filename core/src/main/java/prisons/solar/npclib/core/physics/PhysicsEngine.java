@@ -122,6 +122,30 @@ public class PhysicsEngine {
     private static final double VELOCITY_THRESHOLD = 0.1d;
     private static final double MAX_MOVEMENT_PER_STEP = 0.8d;  // Prevents tunneling through blocks
 
+    // Vanilla water physics constants
+    private static final double WATER_GRAVITY = -0.02d;  // Very slow downward pull in water
+    private static final double WATER_DRAG = 0.8d;  // Horizontal drag in water
+    private static final double WATER_VERTICAL_DRAG = 0.8d;  // Vertical drag slows falling
+    private static final double WATER_TERMINAL_VELOCITY = -0.4d;  // Max sink speed in water (much slower than air)
+    private static final double BUBBLE_COLUMN_UP_SPEED = 0.7d;  // Soul sand bubble column
+    private static final double BUBBLE_COLUMN_DOWN_SPEED = 0.9d;  // Magma bubble column
+
+    // Vanilla lava physics constants
+    private static final double LAVA_GRAVITY = -8.0d;  // Much slower fall in lava
+    private static final double LAVA_DRAG = 0.5d;  // Heavy drag in lava
+    private static final int LAVA_FIRE_TICKS = 300;  // 15 seconds of fire from lava
+
+    // Vanilla fire constants
+    private static final int FIRE_BLOCK_TICKS = 160;  // 8 seconds from fire blocks
+    private static final int FIRE_DAMAGE_INTERVAL = 20;  // Damage every second (20 ticks)
+    private static final float FIRE_DAMAGE = 1.0f;  // 0.5 hearts per tick
+    private static final float LAVA_DAMAGE = 4.0f;  // 2 hearts per tick
+
+    // Vanilla drowning constants
+    private static final int DROWN_DAMAGE_INTERVAL = 20;  // Damage every second when out of air
+    private static final float DROWN_DAMAGE = 2.0f;  // 1 heart per tick
+    private static final int AIR_RECOVERY_RATE = 4;  // Air recovered per tick out of water
+
     public PhysicsEngine(CollisionManager collisionManager, ScheduledExecutorService scheduler) {
         this.collisionManager = collisionManager;
         this.scheduler = scheduler;
@@ -169,6 +193,9 @@ public class PhysicsEngine {
         if (!state.isGravityEnabled()) return;
 
         Position currentPos = npc.getPosition();
+
+        // Process environmental physics (fire, water, lava)
+        processEnvironmentalPhysics(state, currentPos);
 
         if (state.isOnGround()) {
             BlockPosition below = BlockPosition.of(
@@ -340,7 +367,7 @@ public class PhysicsEngine {
         return Optional.ofNullable(state).map(PhysicsState::isOnGround);
     }
 
-    private static @NotNull Vector3d getVector3d(PhysicsState state, float deltaTime, NPC<?> npc) {
+    private @NotNull Vector3d getVector3d(PhysicsState state, float deltaTime, NPC<?> npc) {
         Vector3d v = state.getVelocity();
         Vector3d targetVel = state.getTargetVelocity();
 
@@ -348,7 +375,13 @@ public class PhysicsEngine {
         // This handles knockback/jumps even if onGround flag hasn't updated yet
         boolean effectivelyOnGround = state.isOnGround() && v.getY() <= 0.1;
 
-        if (!effectivelyOnGround) {
+        // Check for liquid physics
+        if (state.isInWater()) {
+            v = applyWaterPhysics(state, v, deltaTime, npc);
+        } else if (state.isInLava()) {
+            v = applyLavaPhysics(state, v, deltaTime);
+        } else if (!effectivelyOnGround) {
+            // Normal air physics
             double force = GRAVITY * state.getGravityMultiplier() * deltaTime;
             v = v.add(0, force, 0);
 
@@ -358,6 +391,7 @@ public class PhysicsEngine {
 
             v = new Vector3d(v.getX() * AIR_RESISTANCE, v.getY() * AIR_RESISTANCE, v.getZ() * AIR_RESISTANCE);
         } else {
+            // Ground physics
             if (targetVel != null) {
                 v = new Vector3d(targetVel.getX(), v.getY(), targetVel.getZ());
             } else {
@@ -369,5 +403,336 @@ public class PhysicsEngine {
             }
         }
         return v;
+    }
+
+    /**
+     * Applies water physics - entities sink slowly with heavy drag.
+     * Much slower than air falling, with bubble column support.
+     */
+    private Vector3d applyWaterPhysics(PhysicsState state, Vector3d v, float deltaTime, NPC<?> npc) {
+        Position pos = npc.getPosition();
+        WorldProvider worldProvider = collisionManager.getWorldProvider();
+
+        // Check for bubble column at entity position
+        BlockPosition blockPos = BlockPosition.of(
+            pos.worldId(),
+            (int) Math.floor(pos.x()),
+            (int) Math.floor(pos.y()),
+            (int) Math.floor(pos.z())
+        );
+
+        WorldProvider.BubbleColumnType bubbleType = worldProvider.getBubbleColumnType(blockPos);
+
+        double vy = v.getY();
+
+        if (bubbleType == WorldProvider.BubbleColumnType.UPWARD) {
+            // Soul sand bubble column - push up strongly
+            vy = Math.min(vy + BUBBLE_COLUMN_UP_SPEED * deltaTime * 20, BUBBLE_COLUMN_UP_SPEED);
+        } else if (bubbleType == WorldProvider.BubbleColumnType.DOWNWARD) {
+            // Magma bubble column - pull down faster
+            vy = Math.max(vy - BUBBLE_COLUMN_DOWN_SPEED * deltaTime * 20, -BUBBLE_COLUMN_DOWN_SPEED);
+        } else {
+            // Normal water - slow sinking with drag
+            // Apply very gentle gravity (much less than air)
+            vy = vy + WATER_GRAVITY;
+
+            // Apply vertical drag to slow down falling
+            vy = vy * WATER_VERTICAL_DRAG;
+
+            // Clamp to water terminal velocity (slow sink, not instant)
+            if (vy < WATER_TERMINAL_VELOCITY) {
+                vy = WATER_TERMINAL_VELOCITY;
+            }
+        }
+
+        // Apply horizontal water drag
+        double vx = v.getX() * WATER_DRAG;
+        double vz = v.getZ() * WATER_DRAG;
+
+        return new Vector3d(vx, vy, vz);
+    }
+
+    /**
+     * Applies lava physics - very heavy drag and slow movement.
+     */
+    private Vector3d applyLavaPhysics(PhysicsState state, Vector3d v, float deltaTime) {
+        // Lava has very heavy drag and slow gravity
+        double force = LAVA_GRAVITY * state.getGravityMultiplier() * deltaTime;
+        double vy = v.getY() + force;
+
+        // Lava terminal velocity
+        if (vy < TERMINAL_VELOCITY * 0.25) {
+            vy = TERMINAL_VELOCITY * 0.25;
+        }
+
+        // Apply heavy lava drag
+        double vx = v.getX() * LAVA_DRAG;
+        double vz = v.getZ() * LAVA_DRAG;
+        vy = vy * LAVA_DRAG;
+
+        return new Vector3d(vx, vy, vz);
+    }
+
+    /**
+     * Processes environmental effects like fire, water, lava at the entity's position.
+     * Handles ignition, extinguishing, fire damage, and drowning.
+     */
+    private void processEnvironmentalPhysics(PhysicsState state, Position pos) {
+        WorldProvider worldProvider = collisionManager.getWorldProvider();
+        NPC<?> npc = state.getNpc();
+
+        // Get block positions to check (feet level and eye level)
+        BlockPosition feetPos = BlockPosition.of(
+            pos.worldId(),
+            (int) Math.floor(pos.x()),
+            (int) Math.floor(pos.y()),
+            (int) Math.floor(pos.z())
+        );
+
+        BlockPosition eyePos = BlockPosition.of(
+            pos.worldId(),
+            (int) Math.floor(pos.x()),
+            (int) Math.floor(pos.y() + 1.5), // Approximate eye height
+            (int) Math.floor(pos.z())
+        );
+
+        // Check for water/lava at feet or body
+        boolean inWater = worldProvider.isBlockWater(feetPos) || worldProvider.isBlockWater(eyePos);
+        boolean inLava = worldProvider.isBlockLava(feetPos) || worldProvider.isBlockLava(eyePos);
+        boolean inFire = worldProvider.isBlockFire(feetPos);
+        boolean isRaining = worldProvider.isRainingAt(feetPos);
+
+        // Update liquid state
+        boolean wasInWater = state.isInWater();
+        state.setInWater(inWater);
+        state.setInLava(inLava);
+
+        // Handle fire ignition and extinguishing
+        if (!state.isFireImmune()) {
+            if (inLava) {
+                // Lava sets fire for longer and deals immediate damage
+                state.setFireTicks(Math.max(state.getFireTicks(), LAVA_FIRE_TICKS));
+                applyLavaDamage(state, npc);
+            } else if (inFire && !inWater) {
+                // Fire block ignites entity
+                state.setFireTicks(Math.max(state.getFireTicks(), FIRE_BLOCK_TICKS));
+            }
+        }
+
+        // Water or rain extinguishes fire
+        if (inWater || isRaining) {
+            if (state.isOnFire()) {
+                state.extinguish();
+                syncFireVisual(npc, false);
+            }
+        }
+
+        // Process fire ticks and damage
+        if (state.isOnFire() && !state.isFireImmune()) {
+            processFireDamage(state, npc);
+        }
+
+        // Handle drowning
+        if (inWater) {
+            // Check if head is submerged (eye level in water)
+            boolean headSubmerged = worldProvider.isBlockWater(eyePos);
+            if (headSubmerged) {
+                processDrowning(state, npc);
+            } else {
+                // Head above water - recover air slowly
+                state.setAirSupply(Math.min(state.getAirSupply() + AIR_RECOVERY_RATE, state.getMaxAirSupply()));
+            }
+        } else if (wasInWater) {
+            // Just left water - recover air
+            state.restoreAirSupply();
+        }
+
+        // Sync fire visual if fire state changed
+        boolean currentlyOnFire = state.isOnFire();
+        // Visual sync is handled by the metadata system
+    }
+
+    /**
+     * Processes fire damage - deals damage every second while on fire.
+     */
+    private void processFireDamage(PhysicsState state, NPC<?> npc) {
+        // Decrement fire ticks
+        state.setFireTicks(state.getFireTicks() - 1);
+
+        // Increment damage timer
+        state.setFireDamageTimer(state.getFireDamageTimer() + 1);
+
+        // Deal damage every FIRE_DAMAGE_INTERVAL ticks
+        if (state.getFireDamageTimer() >= FIRE_DAMAGE_INTERVAL) {
+            state.setFireDamageTimer(0);
+            applyDamage(npc, FIRE_DAMAGE, "fire");
+        }
+
+        // Sync fire visual
+        if (state.getFireTicks() <= 0) {
+            state.extinguish();
+            syncFireVisual(npc, false);
+        } else {
+            syncFireVisual(npc, true);
+        }
+    }
+
+    /**
+     * Applies immediate lava damage.
+     */
+    private void applyLavaDamage(PhysicsState state, NPC<?> npc) {
+        state.setFireDamageTimer(state.getFireDamageTimer() + 1);
+
+        if (state.getFireDamageTimer() >= FIRE_DAMAGE_INTERVAL / 2) { // Lava damages twice as fast
+            state.setFireDamageTimer(0);
+            applyDamage(npc, LAVA_DAMAGE, "lava");
+        }
+    }
+
+    /**
+     * Processes drowning when head is submerged.
+     */
+    private void processDrowning(PhysicsState state, NPC<?> npc) {
+        // Decrease air supply
+        state.setAirSupply(state.getAirSupply() - 1);
+
+        if (state.getAirSupply() <= 0) {
+            // Out of air - start drowning damage
+            state.setDrownDamageTimer(state.getDrownDamageTimer() + 1);
+
+            if (state.getDrownDamageTimer() >= DROWN_DAMAGE_INTERVAL) {
+                state.setDrownDamageTimer(0);
+                applyDamage(npc, DROWN_DAMAGE, "drowning");
+            }
+        }
+    }
+
+    /**
+     * Applies damage to an NPC if it has a combatant component with health.
+     */
+    private void applyDamage(NPC<?> npc, float amount, String source) {
+        npc.getComponent(prisons.solar.npclib.api.component.CombatantComponent.class).ifPresent(combatant -> {
+            var health = combatant.healthComponent();
+            if (health == null) {
+                return;
+            }
+
+            prisons.solar.npclib.api.health.HealthComponent.DamageType damageType;
+            switch (source) {
+                case "fire" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.FIRE;
+                case "lava" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.LAVA;
+                case "drowning" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.DROWNING;
+                default -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.CUSTOM;
+            }
+
+            prisons.solar.npclib.api.health.HealthComponent.DamageSource damageSource =
+                prisons.solar.npclib.api.health.HealthComponent.DamageSource.of(
+                    damageType, null, null, npc.getPosition()
+                );
+
+            health.damage(damageSource, amount);
+        });
+    }
+
+    /**
+     * Syncs the fire visual to all viewers via the NPC's appearance.
+     */
+    private void syncFireVisual(NPC<?> npc, boolean onFire) {
+        // Update the fire visual through the appearance system
+        var appearance = npc.appearance();
+        if (appearance.isOnFire() != onFire) {
+            appearance.setOnFire(onFire);
+            appearance.markDirty();
+        }
+    }
+
+    // Public methods for external fire/water state access
+
+    /**
+     * Sets an NPC on fire for the specified number of ticks.
+     *
+     * @param npc the NPC to ignite
+     * @param ticks fire duration in ticks (20 ticks = 1 second)
+     */
+    public void setOnFire(NPC<?> npc, int ticks) {
+        PhysicsState state = entities.get(npc.getId());
+        if (state != null && !state.isFireImmune()) {
+            state.setFireTicks(ticks);
+            syncFireVisual(npc, true);
+        }
+    }
+
+    /**
+     * Extinguishes fire on an NPC.
+     *
+     * @param npc the NPC to extinguish
+     */
+    public void extinguish(NPC<?> npc) {
+        PhysicsState state = entities.get(npc.getId());
+        if (state != null) {
+            state.extinguish();
+            syncFireVisual(npc, false);
+        }
+    }
+
+    /**
+     * Checks if an NPC is currently on fire.
+     *
+     * @param npc the NPC to check
+     * @return true if on fire
+     */
+    public boolean isOnFire(NPC<?> npc) {
+        PhysicsState state = entities.get(npc.getId());
+        return state != null && state.isOnFire();
+    }
+
+    /**
+     * Checks if an NPC is currently in water.
+     *
+     * @param npc the NPC to check
+     * @return true if in water
+     */
+    public boolean isInWater(NPC<?> npc) {
+        PhysicsState state = entities.get(npc.getId());
+        return state != null && state.isInWater();
+    }
+
+    /**
+     * Checks if an NPC is currently in lava.
+     *
+     * @param npc the NPC to check
+     * @return true if in lava
+     */
+    public boolean isInLava(NPC<?> npc) {
+        PhysicsState state = entities.get(npc.getId());
+        return state != null && state.isInLava();
+    }
+
+    /**
+     * Sets fire immunity for an NPC.
+     *
+     * @param npc the NPC
+     * @param immune true to make immune to fire
+     */
+    public void setFireImmune(NPC<?> npc, boolean immune) {
+        PhysicsState state = entities.get(npc.getId());
+        if (state != null) {
+            state.setFireImmune(immune);
+            if (immune && state.isOnFire()) {
+                state.extinguish();
+                syncFireVisual(npc, false);
+            }
+        }
+    }
+
+    /**
+     * Gets the remaining air supply for an NPC.
+     *
+     * @param npc the NPC
+     * @return air supply in ticks, or -1 if NPC not registered
+     */
+    public int getAirSupply(NPC<?> npc) {
+        PhysicsState state = entities.get(npc.getId());
+        return state != null ? state.getAirSupply() : -1;
     }
 }

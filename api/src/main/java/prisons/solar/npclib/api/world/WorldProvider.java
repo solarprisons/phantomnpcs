@@ -40,6 +40,68 @@ public interface WorldProvider {
     boolean isBlockSolid(@NotNull BlockPosition position);
 
     /**
+     * Checks if a block at the given position is water.
+     *
+     * @param position the block position
+     * @return true if the block is water or waterlogged
+     */
+    default boolean isBlockWater(@NotNull BlockPosition position) {
+        return false;
+    }
+
+    /**
+     * Checks if a block at the given position is lava.
+     *
+     * @param position the block position
+     * @return true if the block is lava
+     */
+    default boolean isBlockLava(@NotNull BlockPosition position) {
+        return false;
+    }
+
+    /**
+     * Checks if a block at the given position is fire (fire, soul fire, campfire).
+     *
+     * @param position the block position
+     * @return true if the block causes fire damage
+     */
+    default boolean isBlockFire(@NotNull BlockPosition position) {
+        return false;
+    }
+
+    /**
+     * Gets the bubble column type at the given position.
+     *
+     * @param position the block position
+     * @return the bubble column type, or NONE if not a bubble column
+     */
+    default BubbleColumnType getBubbleColumnType(@NotNull BlockPosition position) {
+        return BubbleColumnType.NONE;
+    }
+
+    /**
+     * Checks if it's raining at the given position.
+     *
+     * @param position the block position
+     * @return true if rain can reach this position
+     */
+    default boolean isRainingAt(@NotNull BlockPosition position) {
+        return false;
+    }
+
+    /**
+     * Types of bubble columns in Minecraft.
+     */
+    enum BubbleColumnType {
+        /** Not a bubble column */
+        NONE,
+        /** Soul sand bubble column - pushes entities up */
+        UPWARD,
+        /** Magma block bubble column - pulls entities down */
+        DOWNWARD
+    }
+
+    /**
      * Gets the bounding box of a block at the given position.
      * For standard blocks, this is typically a 1x1x1 cube.
      * For non-full blocks (slabs, stairs, etc.), this returns the actual collision shape.

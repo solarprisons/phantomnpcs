@@ -11,6 +11,18 @@ public class PhysicsState {
     private float gravityMultiplier = 1.0f;
     private volatile boolean onGround = false;
 
+    // Fire state - vanilla: 160 ticks (8 seconds) default burn time
+    private int fireTicks = 0;
+    private int fireTicksOnFireDamage = 0; // Counter for fire damage timing (every 20 ticks = 1 second)
+    private boolean fireImmune = false;
+
+    // Water/liquid state
+    private boolean inWater = false;
+    private boolean inLava = false;
+    private int airSupply = 300; // Vanilla: 300 ticks (15 seconds) max air
+    private static final int MAX_AIR_SUPPLY = 300;
+    private int drownDamageTimer = 0; // Ticks until next drown damage
+
     /**
      * If true, physics will only run when at least one viewer can see this NPC.
      * When no viewers are present, the NPC will be snapped to the ground to prevent floating.
@@ -137,5 +149,179 @@ public class PhysicsState {
         this.lastPhysicsY = y;
         this.lastPhysicsZ = z;
         this.hasLastPhysicsPosition = true;
+    }
+
+    // Fire state methods
+
+    /**
+     * Gets remaining fire ticks. When > 0, entity is visually on fire.
+     *
+     * @return remaining fire ticks
+     */
+    public int getFireTicks() {
+        return fireTicks;
+    }
+
+    /**
+     * Sets fire ticks. Vanilla default is 160 (8 seconds).
+     *
+     * @param ticks fire ticks to set
+     */
+    public void setFireTicks(int ticks) {
+        this.fireTicks = Math.max(0, ticks);
+    }
+
+    /**
+     * Checks if entity is currently on fire (has fire ticks).
+     *
+     * @return true if on fire
+     */
+    public boolean isOnFire() {
+        return fireTicks > 0;
+    }
+
+    /**
+     * Gets the fire damage timer (ticks since last fire damage).
+     *
+     * @return fire damage timer
+     */
+    public int getFireDamageTimer() {
+        return fireTicksOnFireDamage;
+    }
+
+    /**
+     * Sets the fire damage timer.
+     *
+     * @param timer new timer value
+     */
+    public void setFireDamageTimer(int timer) {
+        this.fireTicksOnFireDamage = timer;
+    }
+
+    /**
+     * Checks if entity is immune to fire damage.
+     *
+     * @return true if fire immune
+     */
+    public boolean isFireImmune() {
+        return fireImmune;
+    }
+
+    /**
+     * Sets fire immunity.
+     *
+     * @param fireImmune true to make fire immune
+     */
+    public void setFireImmune(boolean fireImmune) {
+        this.fireImmune = fireImmune;
+    }
+
+    /**
+     * Extinguishes fire (sets fire ticks to 0).
+     */
+    public void extinguish() {
+        this.fireTicks = 0;
+        this.fireTicksOnFireDamage = 0;
+    }
+
+    // Water/liquid state methods
+
+    /**
+     * Checks if entity is in water.
+     *
+     * @return true if in water
+     */
+    public boolean isInWater() {
+        return inWater;
+    }
+
+    /**
+     * Sets whether entity is in water.
+     *
+     * @param inWater true if in water
+     */
+    public void setInWater(boolean inWater) {
+        this.inWater = inWater;
+    }
+
+    /**
+     * Checks if entity is in lava.
+     *
+     * @return true if in lava
+     */
+    public boolean isInLava() {
+        return inLava;
+    }
+
+    /**
+     * Sets whether entity is in lava.
+     *
+     * @param inLava true if in lava
+     */
+    public void setInLava(boolean inLava) {
+        this.inLava = inLava;
+    }
+
+    /**
+     * Gets current air supply (ticks of air remaining).
+     * Vanilla max is 300 ticks (15 seconds).
+     *
+     * @return air supply ticks
+     */
+    public int getAirSupply() {
+        return airSupply;
+    }
+
+    /**
+     * Sets air supply.
+     *
+     * @param airSupply air supply ticks
+     */
+    public void setAirSupply(int airSupply) {
+        this.airSupply = Math.max(0, Math.min(airSupply, MAX_AIR_SUPPLY));
+    }
+
+    /**
+     * Gets maximum air supply.
+     *
+     * @return max air supply (300 ticks)
+     */
+    public int getMaxAirSupply() {
+        return MAX_AIR_SUPPLY;
+    }
+
+    /**
+     * Restores air supply to maximum.
+     */
+    public void restoreAirSupply() {
+        this.airSupply = MAX_AIR_SUPPLY;
+        this.drownDamageTimer = 0;
+    }
+
+    /**
+     * Gets the drown damage timer.
+     *
+     * @return drown damage timer
+     */
+    public int getDrownDamageTimer() {
+        return drownDamageTimer;
+    }
+
+    /**
+     * Sets the drown damage timer.
+     *
+     * @param timer new timer value
+     */
+    public void setDrownDamageTimer(int timer) {
+        this.drownDamageTimer = timer;
+    }
+
+    /**
+     * Checks if entity is submerged in any liquid.
+     *
+     * @return true if in water or lava
+     */
+    public boolean isInLiquid() {
+        return inWater || inLava;
     }
 }
