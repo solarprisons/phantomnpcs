@@ -58,5 +58,4 @@ replay_pid*
 # ===============================
 tmp/
 temp/
-protocol-packetevents/
-com/
+com/github/retrooper/packetevents
