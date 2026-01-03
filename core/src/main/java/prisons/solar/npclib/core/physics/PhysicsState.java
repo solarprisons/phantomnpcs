@@ -324,4 +324,31 @@ public class PhysicsState {
     public boolean isInLiquid() {
         return inWater || inLava;
     }
+
+    // Swimming pose state - tracked to avoid recalculating every tick
+    private boolean activelySwimming = false;
+
+    /**
+     * Gets whether the entity is actively swimming (moving in water).
+     * Used to determine SWIMMING pose.
+     *
+     * @return true if actively swimming
+     */
+    public boolean isActivelySwimming() {
+        return activelySwimming;
+    }
+
+    /**
+     * Sets the actively swimming state.
+     *
+     * @param activelySwimming true if actively swimming
+     * @return true if the state changed
+     */
+    public boolean setActivelySwimming(boolean activelySwimming) {
+        if (this.activelySwimming != activelySwimming) {
+            this.activelySwimming = activelySwimming;
+            return true;
+        }
+        return false;
+    }
 }

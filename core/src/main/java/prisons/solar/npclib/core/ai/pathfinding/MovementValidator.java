@@ -30,6 +30,15 @@ public final class MovementValidator {
             return new MoveResult(MoveType.BLOCKED, 0, "Destination is solid");
         }
 
+        // Check if destination is in water
+        boolean destInWater = worldProvider.isBlockWater(to);
+        boolean fromInWater = worldProvider.isBlockWater(from);
+
+        // If destination is water and can't swim, block
+        if (destInWater && !caps.canSwim()) {
+            return new MoveResult(MoveType.BLOCKED, 0, "Cannot swim");
+        }
+
         // Check head clearance using actual block bounds (handles slabs, stairs)
         double entityHeight = caps.entityHeight();
         double npcTopY = to.y() + entityHeight;  // Top of NPC's head
@@ -50,6 +59,9 @@ public final class MovementValidator {
 
         BlockPosition below = to.add(0, -1, 0);
         boolean hasGroundSupport = worldProvider.isBlockSolid(below);
+
+        // In water, we don't need ground support - we can swim
+        boolean inWater = destInWater || worldProvider.isBlockWater(below);
 
         int dy = to.y() - from.y();
         int dx = to.x() - from.x();
@@ -72,8 +84,8 @@ public final class MovementValidator {
             }
         }
 
-        // For jumps (dy > 0), REQUIRE solid ground to land on - no jumping to air
-        if (dy > 0 && !hasGroundSupport) {
+        // For jumps (dy > 0), REQUIRE solid ground or water to land on
+        if (dy > 0 && !hasGroundSupport && !inWater) {
             return new MoveResult(MoveType.BLOCKED, 0, "No ground to land on after jump");
         }
 
@@ -90,8 +102,9 @@ public final class MovementValidator {
         }
 
         // For walks and falls, calculate fall distance once and validate
+        // In water, no fall damage concerns
         int implicitFallDistance = 0;
-        if (!hasGroundSupport) {
+        if (!hasGroundSupport && !inWater) {
             implicitFallDistance = calculateFallDistance(to, (int) caps.fallTolerance() + 1);
             if (implicitFallDistance > caps.fallTolerance()) {
                 return new MoveResult(MoveType.BLOCKED, 0, "Excessive fall distance: " + implicitFallDistance);
@@ -99,6 +112,13 @@ public final class MovementValidator {
         }
 
         double baseCost = isDiagonal ? 1.414 : 1.0;
+
+        // Swimming - moving in water
+        if (inWater && caps.canSwim()) {
+            // Swimming has slightly higher cost than walking to prefer land routes
+            double swimCost = baseCost * 1.5;
+            return new MoveResult(MoveType.SWIM, swimCost, null);
+        }
 
         if (dy == 0) {
             // Walking into a hole - apply fall cost even though dy == 0
@@ -118,8 +138,6 @@ public final class MovementValidator {
             if (fallDistance > caps.fallTolerance()) {
                 return new MoveResult(MoveType.BLOCKED, 0, "Fall too far: " + fallDistance + " > " + caps.fallTolerance());
             }
-            // High fall cost discourages pathfinder from choosing routes that drop into holes
-            // Cost: base + 3.0 per block fallen (much higher than walking/jumping)
             double fallCost = baseCost + (3.0 * fallDistance);
             return new MoveResult(MoveType.FALL, fallCost, null);
         }
@@ -146,6 +164,7 @@ public final class MovementValidator {
         WALK,
         JUMP,
         FALL,
+        SWIM,
         BLOCKED
     }
 

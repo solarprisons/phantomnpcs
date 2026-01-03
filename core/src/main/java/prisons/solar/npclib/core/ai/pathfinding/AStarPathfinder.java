@@ -162,6 +162,9 @@ public final class AStarPathfinder implements PathfindingComponent {
                                   PriorityQueue<Node> openSet, Map<BlockPosition, Node> openMap,
                                   Set<BlockPosition> closedSet, NodePool pool, UUID excludeNpcId) {
 
+        // Check if we're in water for swimming exploration
+        boolean inWater = worldProvider.isBlockWater(current.position);
+
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;
@@ -179,6 +182,14 @@ public final class AStarPathfinder implements PathfindingComponent {
                     tryAddNeighbor(fallPos, current, goal, caps, openSet, openMap, closedSet, pool, excludeNpcId);
                 }
             }
+        }
+
+        // In water, also explore straight up/down for swimming
+        if (inWater && caps.canSwim()) {
+            BlockPosition upPos = current.position.add(0, 1, 0);
+            BlockPosition downPos = current.position.add(0, -1, 0);
+            tryAddNeighbor(upPos, current, goal, caps, openSet, openMap, closedSet, pool, excludeNpcId);
+            tryAddNeighbor(downPos, current, goal, caps, openSet, openMap, closedSet, pool, excludeNpcId);
         }
     }
 

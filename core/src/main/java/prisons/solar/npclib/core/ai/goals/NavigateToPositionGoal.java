@@ -288,6 +288,7 @@ public class NavigateToPositionGoal implements Goal {
      * Applies movement toward a waypoint using teleport-first approach.
      * Favors teleporting for vertical transitions to avoid physics-related stuck issues.
      * Only uses physics for horizontal movement and large drops (> 1 block).
+     * Handles swimming when in water.
      */
     private void applyMovementToWaypoint(NPC<?> npc, Position current, Position waypoint) {
         double dx = waypoint.x() - current.x();
@@ -298,39 +299,57 @@ public class NavigateToPositionGoal implements Goal {
         // Look toward waypoint while moving
         npc.lookAt(waypoint);
 
-        // Apply horizontal velocity using targetVelocity for continuous movement
-        // Using setVelocity() causes friction decay every tick, making NPCs slow
+        // Check if we're in water (swimming)
+        BlockPosition feetPos = BlockPosition.of(
+            current.worldId(),
+            (int) Math.floor(current.x()),
+            (int) Math.floor(current.y()),
+            (int) Math.floor(current.z())
+        );
+        boolean inWater = worldProvider.isBlockWater(feetPos);
+
+        // Apply horizontal velocity
         double vx = 0;
         double vz = 0;
         if (horizontalDist > 0.1) {
-            vx = (dx / horizontalDist) * speed;
-            vz = (dz / horizontalDist) * speed;
+            double moveSpeed = inWater ? speed * 0.5 : speed; // Slower in water
+            vx = (dx / horizontalDist) * moveSpeed;
+            vz = (dz / horizontalDist) * moveSpeed;
         }
 
-        // Preserve Y velocity from current velocity (for knockback, jumping, falling)
-        // Only set horizontal components in targetVelocity
+        double vy;
+        if (inWater && capabilities.canSwim()) {
+            // Swimming - apply vertical velocity toward waypoint
+            double swimSpeed = speed * 0.4;
+            if (dy > 0.5) {
+                // Need to swim up
+                vy = swimSpeed;
+            } else if (dy < -0.5) {
+                // Need to swim down
+                vy = -swimSpeed * 0.5; // Slower descent
+            } else {
+                // Maintain height - slight upward to counteract sinking
+                vy = 0.02;
+            }
+            npc.setTargetVelocity(new Vector3d(vx, vy, vz));
+            return; // Don't do land-based vertical transitions in water
+        }
+
+        // Land movement - preserve Y velocity for knockback/jumping
         Vector3d currentVel = npc.getVelocity();
         double preserveY = currentVel.getY();
-
-        // Use targetVelocity so physics engine maintains speed without friction decay
-        // Preserve Y component to allow knockback/jumping to work
         npc.setTargetVelocity(new Vector3d(vx, preserveY, vz));
 
-        // Handle vertical transitions
-        // For UPWARD jumps: allow larger horizontal distance (2-block gap jumps)
-        // For drops: use standard threshold
+        // Handle vertical transitions (land only)
         if (dy > 0 && dy <= capabilities.jumpHeight()) {
-            // UPWARD movement - use extended threshold for gap jumps (2.5 blocks max)
             double jumpThreshold = Math.max(jumpHorizontalThreshold, 2.5);
             if (horizontalDist < jumpThreshold) {
                 performVerticalTeleport(npc, current, waypoint, dy);
             }
         } else if (horizontalDist < jumpHorizontalThreshold) {
             if (dy < 0 && dy >= -1.5) {
-                // SMALL DROP (1 block or less): Teleport down to avoid physics issues
                 performVerticalTeleport(npc, current, waypoint, dy);
             }
-            // LARGE DROP (> 1.5 blocks): Let physics handle it naturally
         }
     }
 

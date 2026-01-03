@@ -1,6 +1,11 @@
 package prisons.solar.npclib.core.physics;
 
 import org.jetbrains.annotations.NotNull;
+import prisons.solar.npclib.api.appearance.LivingAppearance;
+import prisons.solar.npclib.api.component.CombatantComponent;
+import prisons.solar.npclib.api.health.HealthComponent;
+import prisons.solar.npclib.api.health.HealthComponent.DamageSource;
+import prisons.solar.npclib.api.health.HealthComponent.DamageType;
 import prisons.solar.npclib.api.math.Vector3d;
 import prisons.solar.npclib.api.npc.NPC;
 import prisons.solar.npclib.api.npc.Position;
@@ -144,6 +149,8 @@ public class PhysicsEngine {
     // Vanilla drowning constants
     private static final int DROWN_DAMAGE_INTERVAL = 20;  // Damage every second when out of air
     private static final float DROWN_DAMAGE = 2.0f;  // 1 heart per tick
+
+    private static final double SWIMMING_SPEED_THRESHOLD = 0.25d;
     private static final int AIR_RECOVERY_RATE = 4;  // Air recovered per tick out of water
 
     public PhysicsEngine(CollisionManager collisionManager, ScheduledExecutorService scheduler) {
@@ -377,7 +384,7 @@ public class PhysicsEngine {
 
         // Check for liquid physics
         if (state.isInWater()) {
-            v = applyWaterPhysics(state, v, deltaTime, npc);
+            v = applyWaterPhysics(state, v, deltaTime, npc, targetVel);
         } else if (state.isInLava()) {
             v = applyLavaPhysics(state, v, deltaTime);
         } else if (!effectivelyOnGround) {
@@ -408,8 +415,11 @@ public class PhysicsEngine {
     /**
      * Applies water physics - entities sink slowly with heavy drag.
      * Much slower than air falling, with bubble column support.
+     * Respects targetVelocity for swimming movement.
+     *
+     * @param targetVel the target velocity (passed from caller to avoid redundant fetch)
      */
-    private Vector3d applyWaterPhysics(PhysicsState state, Vector3d v, float deltaTime, NPC<?> npc) {
+    private Vector3d applyWaterPhysics(PhysicsState state, Vector3d v, float deltaTime, NPC<?> npc, Vector3d targetVel) {
         Position pos = npc.getPosition();
         WorldProvider worldProvider = collisionManager.getWorldProvider();
 
@@ -423,31 +433,52 @@ public class PhysicsEngine {
 
         WorldProvider.BubbleColumnType bubbleType = worldProvider.getBubbleColumnType(blockPos);
 
-        double vy = v.getY();
+        double vx, vy, vz;
 
-        if (bubbleType == WorldProvider.BubbleColumnType.UPWARD) {
-            // Soul sand bubble column - push up strongly
-            vy = Math.min(vy + BUBBLE_COLUMN_UP_SPEED * deltaTime * 20, BUBBLE_COLUMN_UP_SPEED);
-        } else if (bubbleType == WorldProvider.BubbleColumnType.DOWNWARD) {
-            // Magma bubble column - pull down faster
-            vy = Math.max(vy - BUBBLE_COLUMN_DOWN_SPEED * deltaTime * 20, -BUBBLE_COLUMN_DOWN_SPEED);
-        } else {
-            // Normal water - slow sinking with drag
-            // Apply very gentle gravity (much less than air)
-            vy = vy + WATER_GRAVITY;
+        // If NPC has target velocity (swimming), use it instead of passive sinking
+        if (targetVel != null) {
+            // Swimming - use target velocity with water drag applied
+            vx = targetVel.getX() * WATER_DRAG;
+            vz = targetVel.getZ() * WATER_DRAG;
 
-            // Apply vertical drag to slow down falling
-            vy = vy * WATER_VERTICAL_DRAG;
-
-            // Clamp to water terminal velocity (slow sink, not instant)
-            if (vy < WATER_TERMINAL_VELOCITY) {
-                vy = WATER_TERMINAL_VELOCITY;
+            // For vertical movement, respect target velocity (swimming up/down)
+            // but still apply bubble column effects
+            if (bubbleType == WorldProvider.BubbleColumnType.UPWARD) {
+                vy = Math.min(targetVel.getY() + BUBBLE_COLUMN_UP_SPEED * deltaTime * 20, BUBBLE_COLUMN_UP_SPEED);
+            } else if (bubbleType == WorldProvider.BubbleColumnType.DOWNWARD) {
+                vy = Math.max(targetVel.getY() - BUBBLE_COLUMN_DOWN_SPEED * deltaTime * 20, -BUBBLE_COLUMN_DOWN_SPEED);
+            } else {
+                // Apply target vertical velocity with slight drag
+                vy = targetVel.getY() * WATER_VERTICAL_DRAG;
             }
-        }
+        } else {
+            // Passive sinking - no target velocity (idle in water)
+            vy = v.getY();
 
-        // Apply horizontal water drag
-        double vx = v.getX() * WATER_DRAG;
-        double vz = v.getZ() * WATER_DRAG;
+            if (bubbleType == WorldProvider.BubbleColumnType.UPWARD) {
+                // Soul sand bubble column - push up strongly
+                vy = Math.min(vy + BUBBLE_COLUMN_UP_SPEED * deltaTime * 20, BUBBLE_COLUMN_UP_SPEED);
+            } else if (bubbleType == WorldProvider.BubbleColumnType.DOWNWARD) {
+                // Magma bubble column - pull down faster
+                vy = Math.max(vy - BUBBLE_COLUMN_DOWN_SPEED * deltaTime * 20, -BUBBLE_COLUMN_DOWN_SPEED);
+            } else {
+                // Normal water - slow sinking with drag
+                // Apply very gentle gravity (much less than air)
+                vy = vy + WATER_GRAVITY;
+
+                // Apply vertical drag to slow down falling
+                vy = vy * WATER_VERTICAL_DRAG;
+
+                // Clamp to water terminal velocity (slow sink, not instant)
+                if (vy < WATER_TERMINAL_VELOCITY) {
+                    vy = WATER_TERMINAL_VELOCITY;
+                }
+            }
+
+            // Apply horizontal water drag
+            vx = v.getX() * WATER_DRAG;
+            vz = v.getZ() * WATER_DRAG;
+        }
 
         return new Vector3d(vx, vy, vz);
     }
@@ -506,6 +537,12 @@ public class PhysicsEngine {
         boolean wasInWater = state.isInWater();
         state.setInWater(inWater);
         state.setInLava(inLava);
+
+        // Update swimming state and sync pose only when state changes
+        boolean isActivelySwimming = inWater && isSwimmingMovement(state.getTargetVelocity());
+        if (state.setActivelySwimming(isActivelySwimming)) {
+            syncSwimmingPose(npc, isActivelySwimming);
+        }
 
         // Handle fire ignition and extinguishing
         if (!state.isFireImmune()) {
@@ -611,26 +648,18 @@ public class PhysicsEngine {
      * Applies damage to an NPC if it has a combatant component with health.
      */
     private void applyDamage(NPC<?> npc, float amount, String source) {
-        npc.getComponent(prisons.solar.npclib.api.component.CombatantComponent.class).ifPresent(combatant -> {
-            var health = combatant.healthComponent();
-            if (health == null) {
-                return;
-            }
+        npc.getComponent(CombatantComponent.class).ifPresent(combatant -> {
+            HealthComponent health = combatant.healthComponent();
+            if (health == null) return;
 
-            prisons.solar.npclib.api.health.HealthComponent.DamageType damageType;
-            switch (source) {
-                case "fire" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.FIRE;
-                case "lava" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.LAVA;
-                case "drowning" -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.DROWNING;
-                default -> damageType = prisons.solar.npclib.api.health.HealthComponent.DamageType.CUSTOM;
-            }
+            DamageType damageType = switch (source) {
+                case "fire" -> DamageType.FIRE;
+                case "lava" -> DamageType.LAVA;
+                case "drowning" -> DamageType.DROWNING;
+                default -> DamageType.CUSTOM;
+            };
 
-            prisons.solar.npclib.api.health.HealthComponent.DamageSource damageSource =
-                prisons.solar.npclib.api.health.HealthComponent.DamageSource.of(
-                    damageType, null, null, npc.getPosition()
-                );
-
-            health.damage(damageSource, amount);
+            health.damage(DamageSource.of(damageType, null, null, npc.getPosition()), amount);
         });
     }
 
@@ -644,6 +673,31 @@ public class PhysicsEngine {
             appearance.setOnFire(onFire);
             appearance.markDirty();
         }
+    }
+
+    /**
+     * Syncs the swimming pose. Only called when swimming state actually changes.
+     * SWIMMING pose when actively moving in water, STANDING otherwise.
+     */
+    private void syncSwimmingPose(NPC<?> npc, boolean isActivelySwimming) {
+        var appearance = npc.appearance();
+        if (appearance instanceof LivingAppearance living) {
+            living.setPose(isActivelySwimming
+                ? LivingAppearance.EntityPose.SWIMMING
+                : LivingAppearance.EntityPose.STANDING);
+            appearance.markDirty();
+        }
+    }
+
+    /**
+     * Checks if the NPC is actively swimming (has significant horizontal velocity).
+     */
+    private static boolean isSwimmingMovement(Vector3d targetVel) {
+        if (targetVel == null) {
+            return false;
+        }
+        double horizontalSpeedSq = targetVel.getX() * targetVel.getX() + targetVel.getZ() * targetVel.getZ();
+        return horizontalSpeedSq > SWIMMING_SPEED_THRESHOLD;
     }
 
     // Public methods for external fire/water state access
