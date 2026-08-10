@@ -1,4 +1,8 @@
-# Phantom
+# NOTICE - THIS LIBRARY IS NO LONGER MAINTAINED. 
+## Feel free to use this library as your own, modify it, learn from it, what ever you feel like doing with it :) 
+- If needed, feel free to contact me on discord if you have any questions about the design of the library. My discord is `.imposed`
+
+## Phantom
 
 A packet-based NPC library for Paper servers. NPCs are completely client-side so they dont affect server performance the way real entities do.
 
@@ -232,10 +236,6 @@ public void onBlockPlace(BlockPlaceEvent event) {
     );
 }
 ```
-
-## Support
-
-Having issues or got questions? Join our Discord: https://discord.gg/kKqH9HdjKu
 
 ## License
 
